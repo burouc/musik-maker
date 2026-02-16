@@ -153,7 +153,7 @@ Features are grouped by category. Each item is marked with a priority:
 
 - [ ] **[P0]** Save project to server (persist all patterns, arrangement, mixer state)
 - [x] **[P0]** Load saved projects
-- [ ] **[P0]** New project / reset all
+- [x] **[P0]** New project / reset all
 - [ ] **[P1]** Export to WAV (offline render via OfflineAudioContext)
 - [ ] **[P1]** Export to MP3
 - [ ] **[P1]** Undo / redo (full action history)
