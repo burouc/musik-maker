@@ -39,7 +39,7 @@ Features are grouped by category. Each item is marked with a priority:
 ### 2. Piano Roll Enhancements
 
 - [x] **[P0]** Click-and-drag to create notes with variable duration
-- [ ] **[P0]** Note resize by dragging note edges
+- [x] **[P0]** Note resize by dragging note edges
 - [ ] **[P0]** Note deletion (right-click or delete key)
 - [ ] **[P0]** Note selection (click, shift-click, box select)
 - [ ] **[P0]** Move selected notes (drag, arrow keys)
