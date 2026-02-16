@@ -556,7 +556,7 @@
           "id": "tp-01",
           "priority": "P0",
           "title": "Time position display (bars:beats:ticks and mm:ss)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "tp-02",

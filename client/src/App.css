@@ -97,6 +97,29 @@
   border: 1px solid var(--accent);
 }
 
+.time-display {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-family: var(--font-mono);
+  background: var(--bg-primary);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.time-display-bbt {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 1px;
+}
+
+.time-display-clock {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 .bpm-control {
   display: flex;
   align-items: center;

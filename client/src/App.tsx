@@ -97,6 +97,9 @@ function App() {
         isPlaying={state.isPlaying}
         bpm={state.bpm}
         playbackMode={state.playbackMode}
+        currentStep={state.currentStep}
+        currentMeasure={state.currentMeasure}
+        stepCount={activePattern?.stepCount ?? 16}
         onTogglePlay={togglePlay}
         onBpmChange={setBpm}
         onClearAll={clearAll}
@@ -213,6 +216,8 @@ function App() {
         currentStep={state.currentStep}
         isPlaying={state.isPlaying}
         playbackMode={state.playbackMode}
+        drumTracks={tracks}
+        sampleTracks={sampleTracks}
         onAddLane={addAutomationLane}
         onRemoveLane={removeAutomationLane}
         onToggleLane={toggleAutomationLane}
