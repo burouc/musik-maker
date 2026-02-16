@@ -71,6 +71,7 @@ const INITIAL_STATE: SequencerState = {
   totalSteps: DEFAULT_STEP_COUNT,
   playbackMode: 'pattern',
   currentMeasure: -1,
+  masterVolume: 0.8,
 };
 
 function useSequencer() {
@@ -764,6 +765,12 @@ function useSequencer() {
     }));
   }, []);
 
+  const setMasterVolume = useCallback((volume: number) => {
+    const clamped = Math.max(0, Math.min(1, volume));
+    audioEngine.current.setMasterVolume(clamped);
+    setState((prev) => ({ ...prev, masterVolume: clamped }));
+  }, []);
+
   // Derive active pattern tracks for component consumption
   const activePattern = getActivePattern(state);
   const tracks = activePattern?.tracks ?? [];
@@ -801,6 +808,7 @@ function useSequencer() {
     setArrangementLength,
     setPlaybackMode,
     setPatternStepCount,
+    setMasterVolume,
   };
 }
 

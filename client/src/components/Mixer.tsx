@@ -3,18 +3,22 @@ import type { InstrumentName, Track } from '../types';
 
 interface MixerProps {
   tracks: Track[];
+  masterVolume: number;
   onSetVolume: (trackId: InstrumentName, volume: number) => void;
   onToggleMute: (trackId: InstrumentName) => void;
   onToggleSolo: (trackId: InstrumentName) => void;
   onClearTrack: (trackId: InstrumentName) => void;
+  onSetMasterVolume: (volume: number) => void;
 }
 
 const Mixer: React.FC<MixerProps> = React.memo(({
   tracks,
+  masterVolume,
   onSetVolume,
   onToggleMute,
   onToggleSolo,
   onClearTrack,
+  onSetMasterVolume,
 }) => {
   return (
     <div className="mixer">
@@ -53,6 +57,22 @@ const Mixer: React.FC<MixerProps> = React.memo(({
           </button>
         </div>
       ))}
+
+      <div className="mixer-channel mixer-master-channel">
+        <label className="mixer-channel-name mixer-master-label">Master</label>
+        <input
+          type="range"
+          className="mixer-volume-slider"
+          min={0}
+          max={1}
+          step={0.01}
+          value={masterVolume}
+          onChange={(e) => onSetMasterVolume(parseFloat(e.target.value))}
+        />
+        <span className="mixer-volume-display">
+          {Math.round(masterVolume * 100)}%
+        </span>
+      </div>
     </div>
   );
 });

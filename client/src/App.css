@@ -513,6 +513,20 @@
   color: var(--accent);
 }
 
+/* Master channel */
+.mixer-master-channel {
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
+  padding-left: 12px;
+  background: var(--bg-secondary);
+}
+
+.mixer-master-label {
+  color: var(--accent) !important;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
 /* =========================================================================
    Arrangement (Playlist / Timeline)
    ========================================================================= */

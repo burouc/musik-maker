@@ -88,4 +88,6 @@ export interface SequencerState {
   playbackMode: PlaybackMode;
   /** Current measure index during song-mode playback */
   currentMeasure: number;
+  /** Master channel volume (0–1) */
+  masterVolume: number;
 }
