@@ -53,6 +53,8 @@ function App() {
     audioEngine,
     // Sample management
     loadSample,
+    previewSample,
+    stopPreview,
     addSampleTrack,
     removeSampleTrack,
     setSampleTrackSample,
@@ -113,6 +115,8 @@ function App() {
         onSetSampleTrackSample={setSampleTrackSample}
         onSetSampleTrackPlaybackMode={setSampleTrackPlaybackMode}
         onLoadSample={loadSample}
+        onPreviewSample={previewSample}
+        onStopPreview={stopPreview}
         onAddSampleTrack={addSampleTrack}
         onRemoveSampleTrack={removeSampleTrack}
       />

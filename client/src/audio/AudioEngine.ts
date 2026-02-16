@@ -50,6 +50,8 @@ class AudioEngine {
   private sampleFilterSendGains: Map<string, GainNode> = new Map();
   /** Active looping sources per track, so they can be stopped */
   private activeSampleSources: Map<string, { source: AudioBufferSourceNode; gain: GainNode }> = new Map();
+  /** Active preview source (for auditioning samples before loading) */
+  private previewSource: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
 
   constructor() {
     this.context = new AudioContext();
@@ -585,6 +587,46 @@ class AudioEngine {
   stopAllSamples(): void {
     for (const [trackId] of this.activeSampleSources) {
       this.stopSample(trackId);
+    }
+  }
+
+  /** Decode an audio file and play it as a preview through the master bus. */
+  async previewSample(file: File): Promise<void> {
+    await this.resume();
+    this.stopPreview();
+
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+
+    const source = this.context.createBufferSource();
+    source.buffer = audioBuffer;
+
+    const gain = this.context.createGain();
+    gain.gain.value = 0.8;
+
+    source.connect(gain);
+    gain.connect(this.masterGain);
+    source.start();
+
+    this.previewSource = { source, gain };
+    source.onended = () => {
+      if (this.previewSource?.source === source) {
+        this.previewSource = null;
+      }
+    };
+  }
+
+  /** Stop any currently playing preview. */
+  stopPreview(): void {
+    if (this.previewSource) {
+      try {
+        this.previewSource.source.stop();
+      } catch {
+        // Already stopped
+      }
+      this.previewSource.source.disconnect();
+      this.previewSource.gain.disconnect();
+      this.previewSource = null;
     }
   }
 

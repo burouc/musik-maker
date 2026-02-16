@@ -526,6 +526,65 @@
   background: #a855f7;
 }
 
+.sample-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  margin: 2px 0;
+  font-size: 0.65rem;
+}
+
+.sample-preview-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80px;
+  color: var(--text-secondary);
+}
+
+.sample-preview-btn {
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.sample-preview-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sample-preview-btn.confirm {
+  color: #22c55e;
+}
+
+.sample-preview-btn.confirm:hover {
+  background: #22c55e;
+  color: #fff;
+}
+
+.sample-preview-btn.cancel {
+  color: #e94560;
+}
+
+.sample-preview-btn.cancel:hover {
+  background: #e94560;
+  color: #fff;
+}
+
 /* =========================================================================
    Mixer
    ========================================================================= */

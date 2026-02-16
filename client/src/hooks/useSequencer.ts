@@ -1005,6 +1005,14 @@ function useSequencer() {
     return sample;
   }, []);
 
+  const previewSample = useCallback(async (file: File): Promise<void> => {
+    await audioEngine.current.previewSample(file);
+  }, []);
+
+  const stopPreview = useCallback((): void => {
+    audioEngine.current.stopPreview();
+  }, []);
+
   const removeSampleInstrument = useCallback((sampleId: string) => {
     setState((prev) => {
       const sample = prev.samples.find((s) => s.id === sampleId);
@@ -1385,6 +1393,8 @@ function useSequencer() {
     setSynthSettings,
     // Sample management
     loadSample,
+    previewSample,
+    stopPreview,
     removeSampleInstrument,
     addSampleTrack,
     removeSampleTrack,

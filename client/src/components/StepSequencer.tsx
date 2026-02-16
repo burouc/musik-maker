@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import type { InstrumentName, Track, SampleTrack, SampleInstrument, SamplePlaybackMode } from '../types';
 import { ACCEPTED_SAMPLE_MIME_TYPES } from '../audio/AudioEngine';
 
@@ -147,6 +147,8 @@ interface SampleStepRowProps {
   onSetSample: (trackId: string, sampleId: string | null) => void;
   onSetPlaybackMode: (trackId: string, mode: SamplePlaybackMode) => void;
   onLoadSample: (file: File) => Promise<SampleInstrument | null>;
+  onPreviewSample: (file: File) => Promise<void>;
+  onStopPreview: () => void;
   onRemoveTrack: (trackId: string) => void;
 }
 
@@ -161,6 +163,8 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
   onSetSample,
   onSetPlaybackMode,
   onLoadSample,
+  onPreviewSample,
+  onStopPreview,
   onRemoveTrack,
 }) {
   const dragRef = useRef<{
@@ -173,6 +177,8 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, stepIndex: number) => {
@@ -227,18 +233,44 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
   );
 
   const handleFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const sample = await onLoadSample(file);
-      if (sample) {
-        onSetSample(track.id, sample.id);
-      }
+      setPendingFile(file);
+      setIsPreviewing(false);
       // Reset input so same file can be re-selected
       e.target.value = '';
     },
-    [track.id, onLoadSample, onSetSample],
+    [],
   );
+
+  const handlePreviewPlay = useCallback(async () => {
+    if (!pendingFile) return;
+    setIsPreviewing(true);
+    await onPreviewSample(pendingFile);
+  }, [pendingFile, onPreviewSample]);
+
+  const handlePreviewStop = useCallback(() => {
+    setIsPreviewing(false);
+    onStopPreview();
+  }, [onStopPreview]);
+
+  const handlePreviewConfirm = useCallback(async () => {
+    if (!pendingFile) return;
+    onStopPreview();
+    const sample = await onLoadSample(pendingFile);
+    if (sample) {
+      onSetSample(track.id, sample.id);
+    }
+    setPendingFile(null);
+    setIsPreviewing(false);
+  }, [pendingFile, track.id, onLoadSample, onSetSample, onStopPreview]);
+
+  const handlePreviewCancel = useCallback(() => {
+    onStopPreview();
+    setPendingFile(null);
+    setIsPreviewing(false);
+  }, [onStopPreview]);
 
   const currentSample = samples.find((s) => s.id === track.sampleId);
 
@@ -292,6 +324,34 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
           onChange={handleFileChange}
         />
       </div>
+      {pendingFile && (
+        <div className="sample-preview-bar">
+          <span className="sample-preview-name" title={pendingFile.name}>
+            {pendingFile.name}
+          </span>
+          <button
+            className="sample-preview-btn"
+            onClick={isPreviewing ? handlePreviewStop : handlePreviewPlay}
+            title={isPreviewing ? 'Stop preview' : 'Preview sample'}
+          >
+            {isPreviewing ? '\u25A0' : '\u25B6'}
+          </button>
+          <button
+            className="sample-preview-btn confirm"
+            onClick={handlePreviewConfirm}
+            title="Load sample"
+          >
+            \u2713
+          </button>
+          <button
+            className="sample-preview-btn cancel"
+            onClick={handlePreviewCancel}
+            title="Cancel"
+          >
+            \u2717
+          </button>
+        </div>
+      )}
       <div className="step-cells">
         {track.steps.map((velocity, stepIndex) => {
           const active = velocity > 0;
@@ -350,6 +410,8 @@ interface StepSequencerProps {
   onSetSampleTrackSample: (trackId: string, sampleId: string | null) => void;
   onSetSampleTrackPlaybackMode: (trackId: string, mode: SamplePlaybackMode) => void;
   onLoadSample: (file: File) => Promise<SampleInstrument | null>;
+  onPreviewSample: (file: File) => Promise<void>;
+  onStopPreview: () => void;
   onAddSampleTrack: () => void;
   onRemoveSampleTrack: (trackId: string) => void;
 }
@@ -371,6 +433,8 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
   onSetSampleTrackSample,
   onSetSampleTrackPlaybackMode,
   onLoadSample,
+  onPreviewSample,
+  onStopPreview,
   onAddSampleTrack,
   onRemoveSampleTrack,
 }) {
@@ -426,6 +490,8 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
           onSetSample={onSetSampleTrackSample}
           onSetPlaybackMode={onSetSampleTrackPlaybackMode}
           onLoadSample={onLoadSample}
+          onPreviewSample={onPreviewSample}
+          onStopPreview={onStopPreview}
           onRemoveTrack={onRemoveSampleTrack}
         />
       ))}
