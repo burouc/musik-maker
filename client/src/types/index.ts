@@ -44,6 +44,8 @@ export interface ArrangementBlock {
   patternId: string;
   /** Measure index (0-based) where this block starts */
   startMeasure: number;
+  /** Duration in measures (default 1) */
+  duration: number;
 }
 
 export interface ArrangementTrack {

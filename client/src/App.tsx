@@ -36,6 +36,7 @@ function App() {
     pastePianoNotes,
     toggleArrangementBlock,
     placeArrangementBlock,
+    resizeArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,
@@ -179,6 +180,7 @@ function App() {
         isPlaying={state.isPlaying}
         onToggleBlock={toggleArrangementBlock}
         onPlaceBlock={placeArrangementBlock}
+        onResizeBlock={resizeArrangementBlock}
         onToggleTrackMute={toggleArrangementTrackMute}
         onAddTrack={addArrangementTrack}
         onRemoveTrack={removeArrangementTrack}

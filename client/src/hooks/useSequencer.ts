@@ -222,7 +222,8 @@ function useSequencer() {
               if (arrTrack.muted) continue;
 
               for (const block of arrTrack.blocks) {
-                if (block.startMeasure === nextMeasure) {
+                const blockEnd = block.startMeasure + (block.duration ?? 1);
+                if (nextMeasure >= block.startMeasure && nextMeasure < blockEnd) {
                   const pattern = current.patterns.find(
                     (p) => p.id === block.patternId,
                   );
@@ -817,7 +818,7 @@ function useSequencer() {
           }
 
           // Add new block
-          const newBlock: ArrangementBlock = { patternId, startMeasure: measure };
+          const newBlock: ArrangementBlock = { patternId, startMeasure: measure, duration: 1 };
           return {
             ...arrTrack,
             blocks: [...arrTrack.blocks, newBlock],
@@ -850,10 +851,30 @@ function useSequencer() {
           }
 
           // Add new block
-          const newBlock: ArrangementBlock = { patternId, startMeasure: measure };
+          const newBlock: ArrangementBlock = { patternId, startMeasure: measure, duration: 1 };
           return {
             ...arrTrack,
             blocks: [...arrTrack.blocks, newBlock],
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const resizeArrangementBlock = useCallback(
+    (arrTrackId: string, startMeasure: number, newDuration: number) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            blocks: arrTrack.blocks.map((b) =>
+              b.startMeasure === startMeasure
+                ? { ...b, duration: Math.max(1, newDuration) }
+                : b,
+            ),
           };
         }),
       }));
@@ -1411,6 +1432,7 @@ function useSequencer() {
     clearPianoRoll,
     toggleArrangementBlock,
     placeArrangementBlock,
+    resizeArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,

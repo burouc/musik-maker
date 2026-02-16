@@ -1224,6 +1224,37 @@
   overflow: hidden;
   text-overflow: ellipsis;
   padding: 0 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Multi-cell block span */
+.arrangement-block-span {
+  position: relative;
+  cursor: pointer;
+  justify-content: flex-start;
+}
+
+/* Resize handle on right edge of blocks */
+.arrangement-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0 3px 3px 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.arrangement-block-span:hover .arrangement-resize-handle {
+  opacity: 1;
+}
+
+.arrangement-resize-handle:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* =========================================================================
