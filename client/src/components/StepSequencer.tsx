@@ -2,6 +2,9 @@ import React, { useCallback, useRef, useState } from 'react';
 import type { InstrumentName, Track, SampleTrack, SampleInstrument, SamplePlaybackMode } from '../types';
 import { ACCEPTED_SAMPLE_MIME_TYPES } from '../audio/AudioEngine';
 
+/** Steps at or below this velocity are rendered as ghost notes (visually dimmed) */
+const GHOST_NOTE_THRESHOLD = 0.5;
+
 interface StepRowProps {
   track: Track;
   currentStep: number;
@@ -101,6 +104,7 @@ const StepRow = React.memo<StepRowProps>(function StepRow({
           const pitch = track.pitches[stepIndex];
           const classes = ['step-cell'];
           if (active) classes.push('active');
+          if (active && velocity <= GHOST_NOTE_THRESHOLD) classes.push('ghost');
           if (isPlaying && stepIndex === currentStep) classes.push('current');
           if (stepIndex % 4 === 0) classes.push('beat-start');
 
@@ -358,6 +362,7 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
           const pitch = track.pitches[stepIndex];
           const classes = ['step-cell'];
           if (active) classes.push('active');
+          if (active && velocity <= GHOST_NOTE_THRESHOLD) classes.push('ghost');
           if (isPlaying && stepIndex === currentStep) classes.push('current');
           if (stepIndex % 4 === 0) classes.push('beat-start');
 

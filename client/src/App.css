@@ -774,6 +774,17 @@
   box-shadow: 0 0 14px rgba(233, 69, 96, 0.6);
 }
 
+/* Ghost note — reduced velocity visual distinction (velocity ≤ 50%) */
+.step-cell.ghost {
+  opacity: 0.5;
+  box-shadow: none;
+  border-style: dashed;
+}
+
+.step-cell.ghost.current {
+  opacity: 0.65;
+}
+
 /* Beat group separator */
 .step-cell.beat-start {
   margin-left: 6px;
