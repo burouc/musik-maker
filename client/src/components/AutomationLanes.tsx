@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import type { AutomationLane, AutomationTarget, InstrumentName, ChannelAutomationParam } from '../types';
+import type { AutomationLane, AutomationTarget, ChannelAutomationParam } from '../types';
 
 /** Drawing tool mode for automation lanes */
 type DrawMode = 'point' | 'freehand' | 'line' | 'erase';

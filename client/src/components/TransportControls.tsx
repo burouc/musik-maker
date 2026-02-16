@@ -82,7 +82,7 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
     playbackMode,
     currentStep,
     currentMeasure,
-    stepCount,
+    stepCount: _stepCount,
     onTogglePlay,
     onBpmChange,
     onClearAll,

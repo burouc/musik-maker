@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, SynthSettings, OscillatorType, SampleFormat } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat } from '../types';
 
 /** Accepted MIME types for sample loading */
 const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {

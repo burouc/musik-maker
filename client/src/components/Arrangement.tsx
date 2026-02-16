@@ -191,7 +191,7 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
     }
   }, [loopStart, loopEnd, settingLoop, onSetLoopStart, onSetLoopEnd, onClearLoop]);
 
-  const handleMeasureRightClick = useCallback((m: number, e: React.MouseEvent) => {
+  const handleMeasureRightClick = useCallback((_m: number, e: React.MouseEvent) => {
     e.preventDefault();
     if (loopStart !== null && loopEnd !== null) {
       // Clear loop on right-click
