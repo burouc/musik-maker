@@ -712,7 +712,7 @@
           "id": "ui-02",
           "priority": "P0",
           "title": "Tabbed view switching (Channel Rack, Piano Roll, Mixer, Arrangement)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "ui-03",
