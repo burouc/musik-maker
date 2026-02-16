@@ -18,6 +18,7 @@ import type {
   AutomationLane,
   AutomationPoint,
   AutomationTarget,
+  ProjectData,
 } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
@@ -98,6 +99,8 @@ const DEFAULT_ARRANGEMENT_TRACKS: ArrangementTrack[] = Array.from(
 const firstPattern = createPattern(0);
 
 const INITIAL_STATE: SequencerState = {
+  projectId: null,
+  projectName: 'Untitled Project',
   patterns: [firstPattern],
   activePatternId: firstPattern.id,
   samples: [],
@@ -1774,6 +1777,94 @@ function useSequencer() {
     }));
   }, []);
 
+  // -----------------------------------------------------------------------
+  // Project save / load
+  // -----------------------------------------------------------------------
+
+  const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
+
+  const setProjectName = useCallback((name: string) => {
+    setState((prev) => ({ ...prev, projectName: name }));
+  }, []);
+
+  const saveProject = useCallback(async (): Promise<void> => {
+    const s = stateRef.current;
+    const id = s.projectId ?? `proj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const project: ProjectData = {
+      id,
+      name: s.projectName,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      bpm: s.bpm,
+      masterVolume: s.masterVolume,
+      masterReverb: s.masterReverb,
+      masterDelay: s.masterDelay,
+      masterFilter: s.masterFilter,
+      patterns: s.patterns,
+      activePatternId: s.activePatternId,
+      arrangement: s.arrangement,
+      arrangementLength: s.arrangementLength,
+      automationLanes: s.automationLanes,
+      loopStart: s.loopStart,
+      loopEnd: s.loopEnd,
+      metronomeEnabled: s.metronomeEnabled,
+    };
+    const res = await fetch(`${API_BASE}/api/projects/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(project),
+    });
+    if (!res.ok) throw new Error('Failed to save project');
+    setState((prev) => ({ ...prev, projectId: id }));
+  }, [API_BASE]);
+
+  const loadProject = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/projects/${id}`);
+    if (!res.ok) throw new Error('Failed to load project');
+    const project: ProjectData = await res.json();
+    setState((prev) => ({
+      ...prev,
+      projectId: project.id,
+      projectName: project.name,
+      bpm: project.bpm,
+      masterVolume: project.masterVolume,
+      masterReverb: project.masterReverb,
+      masterDelay: project.masterDelay,
+      masterFilter: project.masterFilter,
+      patterns: project.patterns,
+      activePatternId: project.activePatternId,
+      arrangement: project.arrangement,
+      arrangementLength: project.arrangementLength,
+      automationLanes: project.automationLanes,
+      loopStart: project.loopStart,
+      loopEnd: project.loopEnd,
+      metronomeEnabled: project.metronomeEnabled,
+      // Reset playback state
+      isPlaying: false,
+      currentStep: -1,
+      currentMeasure: -1,
+      samples: [],
+    }));
+    // Apply loaded audio settings
+    audioEngine.current.setMasterVolume(project.masterVolume);
+    audioEngine.current.setReverbParams(project.masterReverb);
+    audioEngine.current.setDelayParams(project.masterDelay);
+    audioEngine.current.setFilterParams(project.masterFilter);
+  }, [API_BASE]);
+
+  const listProjects = useCallback(async (): Promise<{ id: string; name: string; updatedAt: string }[]> => {
+    const res = await fetch(`${API_BASE}/api/projects`);
+    if (!res.ok) throw new Error('Failed to list projects');
+    return res.json();
+  }, [API_BASE]);
+
+  const deleteProject = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/projects/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete project');
+    // If we deleted the currently loaded project, clear the project reference
+    setState((prev) => prev.projectId === id ? { ...prev, projectId: null } : prev);
+  }, [API_BASE]);
+
   // Derive active pattern tracks for component consumption
   const activePattern = getActivePattern(state);
   const tracks = activePattern?.tracks ?? [];
@@ -1858,6 +1949,12 @@ function useSequencer() {
     setAutomationPoint,
     removeAutomationPoint,
     clearAutomationLane,
+    // Project management
+    saveProject,
+    loadProject,
+    listProjects,
+    deleteProject: deleteProject,
+    setProjectName,
   };
 }
 

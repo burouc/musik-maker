@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react';
 import useSequencer from './hooks/useSequencer';
 import StepSequencer from './components/StepSequencer';
 import TransportControls from './components/TransportControls';
@@ -85,14 +86,133 @@ function App() {
     setAutomationPoint,
     removeAutomationPoint,
     clearAutomationLane,
+    // Project management
+    saveProject,
+    loadProject,
+    listProjects,
+    deleteProject: deleteServerProject,
+    setProjectName,
   } = useSequencer();
+
+  const [saving, setSaving] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<{ id: string; name: string; updatedAt: string }[]>([]);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setSaveStatus(null);
+    try {
+      await saveProject();
+      setSaveStatus('Saved');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch {
+      setSaveStatus('Error saving');
+    } finally {
+      setSaving(false);
+    }
+  }, [saveProject]);
+
+  const handleOpenLoad = useCallback(async () => {
+    try {
+      const projects = await listProjects();
+      setSavedProjects(projects);
+      setShowLoadDialog(true);
+    } catch {
+      setSaveStatus('Error loading project list');
+    }
+  }, [listProjects]);
+
+  const handleLoad = useCallback(async (id: string) => {
+    try {
+      await loadProject(id);
+      setShowLoadDialog(false);
+      setSaveStatus('Loaded');
+      setTimeout(() => setSaveStatus(null), 2000);
+    } catch {
+      setSaveStatus('Error loading project');
+    }
+  }, [loadProject]);
+
+  const handleDeleteProject = useCallback(async (id: string) => {
+    try {
+      await deleteServerProject(id);
+      setSavedProjects((prev) => prev.filter((p) => p.id !== id));
+    } catch {
+      setSaveStatus('Error deleting project');
+    }
+  }, [deleteServerProject]);
+
+  // Ctrl+S keyboard shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleSave]);
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>Musik Maker</h1>
         <span className="app-subtitle">Step Sequencer, Piano Roll &amp; Arrangement</span>
+        <div className="project-bar">
+          <input
+            className="project-name-input"
+            type="text"
+            value={state.projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            placeholder="Project name"
+          />
+          <button className="project-btn project-save-btn" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button className="project-btn" onClick={handleOpenLoad}>
+            Load
+          </button>
+          {saveStatus && <span className="project-status">{saveStatus}</span>}
+        </div>
       </header>
+
+      {showLoadDialog && (
+        <div className="load-dialog-overlay" onClick={() => setShowLoadDialog(false)}>
+          <div className="load-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="load-dialog-header">
+              <h2>Load Project</h2>
+              <button className="load-dialog-close" onClick={() => setShowLoadDialog(false)}>
+                X
+              </button>
+            </div>
+            {savedProjects.length === 0 ? (
+              <p className="load-dialog-empty">No saved projects</p>
+            ) : (
+              <ul className="load-dialog-list">
+                {savedProjects.map((p) => (
+                  <li key={p.id} className="load-dialog-item">
+                    <button className="load-dialog-item-name" onClick={() => handleLoad(p.id)}>
+                      {p.name}
+                    </button>
+                    <span className="load-dialog-item-date">
+                      {new Date(p.updatedAt).toLocaleDateString()}
+                    </span>
+                    <button
+                      className="load-dialog-item-delete"
+                      onClick={() => handleDeleteProject(p.id)}
+                      title="Delete project"
+                    >
+                      X
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       <TransportControls
         isPlaying={state.isPlaying}

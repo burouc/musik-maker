@@ -263,9 +263,34 @@ export interface AutomationLane {
   enabled: boolean;
 }
 
+/** Saved project metadata + state (persisted to server) */
+export interface ProjectData {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  bpm: number;
+  masterVolume: number;
+  masterReverb: ReverbSettings;
+  masterDelay: DelaySettings;
+  masterFilter: FilterSettings;
+  patterns: Pattern[];
+  activePatternId: string;
+  arrangement: ArrangementTrack[];
+  arrangementLength: number;
+  automationLanes: AutomationLane[];
+  loopStart: number | null;
+  loopEnd: number | null;
+  metronomeEnabled: boolean;
+}
+
 export type PlaybackMode = 'pattern' | 'song';
 
 export interface SequencerState {
+  /** Current project ID (null if unsaved) */
+  projectId: string | null;
+  /** Current project name */
+  projectName: string;
   patterns: Pattern[];
   activePatternId: string;
   /** Loaded sample instruments available across all patterns */
