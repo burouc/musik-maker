@@ -87,6 +87,7 @@ function App() {
     removeAutomationPoint,
     clearAutomationLane,
     // Project management
+    newProject,
     saveProject,
     loadProject,
     listProjects,
@@ -98,6 +99,12 @@ function App() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [savedProjects, setSavedProjects] = useState<{ id: string; name: string; updatedAt: string }[]>([]);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  const handleNew = useCallback(() => {
+    if (!confirm('Create a new project? Any unsaved changes will be lost.')) return;
+    newProject();
+    setSaveStatus(null);
+  }, [newProject]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -143,17 +150,21 @@ function App() {
     }
   }, [deleteServerProject]);
 
-  // Ctrl+S keyboard shortcut
+  // Ctrl+S / Ctrl+N keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        handleNew();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSave]);
+  }, [handleSave, handleNew]);
 
   return (
     <div className="app">
@@ -168,6 +179,9 @@ function App() {
             onChange={(e) => setProjectName(e.target.value)}
             placeholder="Project name"
           />
+          <button className="project-btn" onClick={handleNew}>
+            New
+          </button>
           <button className="project-btn project-save-btn" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Save'}
           </button>

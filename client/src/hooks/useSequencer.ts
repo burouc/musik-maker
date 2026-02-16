@@ -1783,6 +1783,29 @@ function useSequencer() {
 
   const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
+  const newProject = useCallback(() => {
+    // Stop playback and clean up samples
+    audioEngine.current.stopAllSamples();
+    // Revoke any sample object URLs
+    for (const sample of stateRef.current.samples) {
+      audioEngine.current.removeSample(sample.url);
+      URL.revokeObjectURL(sample.url);
+    }
+    // Reset state to fresh initial state with a new pattern
+    const freshPattern = createPattern(0);
+    setState({
+      ...INITIAL_STATE,
+      patterns: [freshPattern],
+      activePatternId: freshPattern.id,
+    });
+    // Reset audio engine to defaults
+    audioEngine.current.setMasterVolume(INITIAL_STATE.masterVolume);
+    audioEngine.current.setReverbParams(INITIAL_STATE.masterReverb);
+    audioEngine.current.setDelayParams(INITIAL_STATE.masterDelay);
+    audioEngine.current.setDelayBpm(INITIAL_STATE.bpm, INITIAL_STATE.masterDelay.sync);
+    audioEngine.current.setFilterParams(INITIAL_STATE.masterFilter);
+  }, []);
+
   const setProjectName = useCallback((name: string) => {
     setState((prev) => ({ ...prev, projectName: name }));
   }, []);
@@ -1951,6 +1974,7 @@ function useSequencer() {
     removeAutomationPoint,
     clearAutomationLane,
     // Project management
+    newProject,
     saveProject,
     loadProject,
     listProjects,
