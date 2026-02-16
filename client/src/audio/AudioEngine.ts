@@ -201,17 +201,23 @@ class AudioEngine {
     filter.frequency.setValueAtTime(cutoff, now);
     filter.Q.setValueAtTime(resonance, now);
 
-    // ADSR-ish envelope
+    // ADSR envelope
     const gain = this.context.createGain();
-    const attack = 0.005;
-    const release = Math.min(0.15, duration * 0.3);
-    const sustain = volume * 0.35;
+    const attack = settings?.ampAttack ?? 0.005;
+    const decay = settings?.ampDecay ?? 0.05;
+    const sustainLevel = (settings?.ampSustain ?? 0.7) * volume;
+    const release = settings?.ampRelease ?? 0.15;
+
+    const attackEnd = now + attack;
+    const decayEnd = attackEnd + decay;
+    const releaseStart = now + duration;
+    const releaseEnd = releaseStart + release;
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(volume * 0.4, now + attack);
-    gain.gain.linearRampToValueAtTime(sustain, now + attack + 0.05);
-    gain.gain.setValueAtTime(sustain, now + duration - release);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    gain.gain.linearRampToValueAtTime(volume, attackEnd);
+    gain.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
+    gain.gain.setValueAtTime(sustainLevel, releaseStart);
+    gain.gain.exponentialRampToValueAtTime(0.001, releaseEnd);
 
     osc1.connect(osc1Gain);
     osc2.connect(osc2Gain);
@@ -222,8 +228,8 @@ class AudioEngine {
 
     osc1.start(now);
     osc2.start(now);
-    osc1.stop(now + duration + 0.01);
-    osc2.stop(now + duration + 0.01);
+    osc1.stop(releaseEnd + 0.01);
+    osc2.stop(releaseEnd + 0.01);
   }
 
   async playSound(instrument: InstrumentName, volume: number, pitchOffset: number = 0): Promise<void> {

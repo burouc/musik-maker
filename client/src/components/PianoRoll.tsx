@@ -685,6 +685,60 @@ function PianoRoll({
               title={`Q: ${synthSettings.filterResonance.toFixed(1)}`}
             />
           </div>
+
+          <div className="synth-control-divider" />
+
+          <div className="synth-control-group">
+            <label className="synth-label">Atk</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={2000}
+              value={Math.round(synthSettings.ampAttack * 1000)}
+              onChange={(e) => onSynthSettingsChange({ ampAttack: Number(e.target.value) / 1000 })}
+              title={`Attack: ${synthSettings.ampAttack >= 1 ? `${synthSettings.ampAttack.toFixed(1)}s` : `${Math.round(synthSettings.ampAttack * 1000)}ms`}`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Dec</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={2000}
+              value={Math.round(synthSettings.ampDecay * 1000)}
+              onChange={(e) => onSynthSettingsChange({ ampDecay: Number(e.target.value) / 1000 })}
+              title={`Decay: ${synthSettings.ampDecay >= 1 ? `${synthSettings.ampDecay.toFixed(1)}s` : `${Math.round(synthSettings.ampDecay * 1000)}ms`}`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Sus</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={Math.round(synthSettings.ampSustain * 100)}
+              onChange={(e) => onSynthSettingsChange({ ampSustain: Number(e.target.value) / 100 })}
+              title={`Sustain: ${Math.round(synthSettings.ampSustain * 100)}%`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Rel</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={2000}
+              value={Math.round(synthSettings.ampRelease * 1000)}
+              onChange={(e) => onSynthSettingsChange({ ampRelease: Number(e.target.value) / 1000 })}
+              title={`Release: ${synthSettings.ampRelease >= 1 ? `${synthSettings.ampRelease.toFixed(1)}s` : `${Math.round(synthSettings.ampRelease * 1000)}ms`}`}
+            />
+          </div>
         </div>
 
         {selectedNoteIds.size > 0 && (

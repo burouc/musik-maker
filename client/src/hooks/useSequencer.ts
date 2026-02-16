@@ -37,6 +37,10 @@ const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
   osc2Mix: 0.5,
   filterCutoff: 8000,
   filterResonance: 1,
+  ampAttack: 0.005,
+  ampDecay: 0.05,
+  ampSustain: 0.7,
+  ampRelease: 0.15,
 };
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {

@@ -1389,6 +1389,13 @@
   accent-color: var(--accent);
 }
 
+.synth-control-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+}
+
 /* Selection count indicator in header */
 .piano-roll-selection-count {
   font-size: 0.7rem;

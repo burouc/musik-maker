@@ -143,6 +143,14 @@ export interface SynthSettings {
   filterCutoff: number;
   /** Filter resonance (Q factor): 0.1–25 */
   filterResonance: number;
+  /** Amplitude envelope attack time in seconds (0.001–2) */
+  ampAttack: number;
+  /** Amplitude envelope decay time in seconds (0.001–2) */
+  ampDecay: number;
+  /** Amplitude envelope sustain level (0–1) */
+  ampSustain: number;
+  /** Amplitude envelope release time in seconds (0.001–2) */
+  ampRelease: number;
 }
 
 export type PlaybackMode = 'pattern' | 'song';
