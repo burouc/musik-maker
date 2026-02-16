@@ -22,7 +22,7 @@
           "id": "cr-02",
           "priority": "P0",
           "title": "Per-step velocity editing (click-drag to set hit strength)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "cr-03",
