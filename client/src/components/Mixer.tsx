@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import type { InstrumentName, Track } from '../types';
+import type { InstrumentName, Track, ReverbSettings } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
 interface MixerProps {
   tracks: Track[];
   masterVolume: number;
+  masterReverb: ReverbSettings;
   audioEngine: AudioEngine;
   onSetVolume: (trackId: InstrumentName, volume: number) => void;
   onSetPan: (trackId: InstrumentName, pan: number) => void;
@@ -12,6 +13,8 @@ interface MixerProps {
   onToggleSolo: (trackId: InstrumentName) => void;
   onClearTrack: (trackId: InstrumentName) => void;
   onSetMasterVolume: (volume: number) => void;
+  onSetReverbSend: (trackId: InstrumentName, send: number) => void;
+  onSetMasterReverb: (params: Partial<ReverbSettings>) => void;
 }
 
 /** Number of LED segments in each VU meter */
@@ -57,6 +60,7 @@ VuMeter.displayName = 'VuMeter';
 const Mixer: React.FC<MixerProps> = ({
   tracks,
   masterVolume,
+  masterReverb,
   audioEngine,
   onSetVolume,
   onSetPan,
@@ -64,6 +68,8 @@ const Mixer: React.FC<MixerProps> = ({
   onToggleSolo,
   onClearTrack,
   onSetMasterVolume,
+  onSetReverbSend,
+  onSetMasterReverb,
 }) => {
   const rafRef = useRef<number>(0);
   const mixerRef = useRef<HTMLDivElement>(null);
@@ -133,6 +139,19 @@ const Mixer: React.FC<MixerProps> = ({
           <span className="mixer-pan-display">
             {track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.round(Math.abs(track.pan) * 100)}` : `R${Math.round(track.pan * 100)}`}
           </span>
+          <label className="mixer-reverb-label">REV</label>
+          <input
+            type="range"
+            className="mixer-reverb-slider"
+            min={0}
+            max={1}
+            step={0.01}
+            value={track.reverbSend}
+            onChange={(e) => onSetReverbSend(track.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-reverb-display">
+            {Math.round(track.reverbSend * 100)}%
+          </span>
           <button
             className={`mixer-btn mute-btn${track.muted ? ' active' : ''}`}
             onClick={() => onToggleMute(track.id)}
@@ -171,6 +190,48 @@ const Mixer: React.FC<MixerProps> = ({
         <span className="mixer-volume-display">
           {Math.round(masterVolume * 100)}%
         </span>
+      </div>
+
+      <div className="mixer-channel mixer-reverb-channel">
+        <label className="mixer-channel-name mixer-reverb-title">Reverb</label>
+        <div className="mixer-reverb-params">
+          <div className="mixer-reverb-param">
+            <label>Decay</label>
+            <input
+              type="range"
+              min={0.1}
+              max={10}
+              step={0.1}
+              value={masterReverb.decay}
+              onChange={(e) => onSetMasterReverb({ decay: parseFloat(e.target.value) })}
+            />
+            <span>{masterReverb.decay.toFixed(1)}s</span>
+          </div>
+          <div className="mixer-reverb-param">
+            <label>Pre-Delay</label>
+            <input
+              type="range"
+              min={0}
+              max={0.1}
+              step={0.001}
+              value={masterReverb.preDelay}
+              onChange={(e) => onSetMasterReverb({ preDelay: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round(masterReverb.preDelay * 1000)}ms</span>
+          </div>
+          <div className="mixer-reverb-param">
+            <label>Damping</label>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={masterReverb.damping}
+              onChange={(e) => onSetMasterReverb({ damping: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round(masterReverb.damping * 100)}%</span>
+          </div>
+        </div>
       </div>
     </div>
   );

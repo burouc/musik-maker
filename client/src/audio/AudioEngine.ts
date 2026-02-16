@@ -1,4 +1,4 @@
-import type { InstrumentName } from '../types';
+import type { InstrumentName, ReverbSettings } from '../types';
 
 class AudioEngine {
   private context: AudioContext;
@@ -7,6 +7,14 @@ class AudioEngine {
   private panners: Map<InstrumentName, StereoPannerNode> = new Map();
   private channelAnalysers: Map<InstrumentName, AnalyserNode> = new Map();
   private masterAnalyser: AnalyserNode;
+
+  // Reverb send/return bus
+  private reverbSendGains: Map<InstrumentName, GainNode> = new Map();
+  private reverbBus: GainNode;
+  private reverbPreDelay: DelayNode;
+  private reverbConvolver: ConvolverNode;
+  private reverbDamping: BiquadFilterNode;
+  private reverbReturnGain: GainNode;
 
   constructor() {
     this.context = new AudioContext();
@@ -20,6 +28,28 @@ class AudioEngine {
     this.masterAnalyser.connect(this.context.destination);
     this.masterGain.gain.value = 0.8;
 
+    // Reverb send/return bus
+    // Signal flow: channel send gains → reverbBus → preDelay → convolver → damping → returnGain → masterGain
+    this.reverbBus = this.context.createGain();
+    this.reverbPreDelay = this.context.createDelay(0.1);
+    this.reverbPreDelay.delayTime.value = 0.01;
+    this.reverbConvolver = this.context.createConvolver();
+    this.reverbDamping = this.context.createBiquadFilter();
+    this.reverbDamping.type = 'lowpass';
+    this.reverbDamping.frequency.value = 8000;
+    this.reverbDamping.Q.value = 0.7;
+    this.reverbReturnGain = this.context.createGain();
+    this.reverbReturnGain.gain.value = 1;
+
+    this.reverbBus.connect(this.reverbPreDelay);
+    this.reverbPreDelay.connect(this.reverbConvolver);
+    this.reverbConvolver.connect(this.reverbDamping);
+    this.reverbDamping.connect(this.reverbReturnGain);
+    this.reverbReturnGain.connect(this.masterGain);
+
+    // Generate initial impulse response
+    this.reverbConvolver.buffer = this.generateImpulseResponse(2, 4000);
+
     // Create a stereo panner + analyser per instrument channel
     const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion'];
     for (const name of instruments) {
@@ -31,8 +61,15 @@ class AudioEngine {
       panner.connect(analyser);
       analyser.connect(this.masterGain);
 
+      // Reverb send: taps from panner output into the reverb bus
+      const sendGain = this.context.createGain();
+      sendGain.gain.value = 0; // dry by default
+      panner.connect(sendGain);
+      sendGain.connect(this.reverbBus);
+
       this.panners.set(name, panner);
       this.channelAnalysers.set(name, analyser);
+      this.reverbSendGains.set(name, sendGain);
     }
 
     // Pre-generate a reusable white noise buffer (2 seconds of noise)
@@ -155,6 +192,35 @@ class AudioEngine {
   /** Read peak level (0–1) for the master bus. */
   getMasterLevel(): number {
     return this.readPeak(this.masterAnalyser);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reverb controls
+  // ---------------------------------------------------------------------------
+
+  /** Set the reverb send level for a channel (0–1). */
+  setChannelReverbSend(instrument: InstrumentName, value: number): void {
+    const sendGain = this.reverbSendGains.get(instrument);
+    if (sendGain) {
+      sendGain.gain.value = Math.max(0, Math.min(1, value));
+    }
+  }
+
+  /** Update the master reverb parameters. Regenerates the impulse response if decay changes. */
+  setReverbParams(params: Partial<ReverbSettings>): void {
+    if (params.preDelay !== undefined) {
+      this.reverbPreDelay.delayTime.value = Math.max(0, Math.min(0.1, params.preDelay));
+    }
+    if (params.damping !== undefined) {
+      // Map damping 0–1 to frequency 12000–1000 Hz (0 = bright, 1 = dark)
+      const freq = 12000 - params.damping * 11000;
+      this.reverbDamping.frequency.value = Math.max(1000, Math.min(12000, freq));
+    }
+    if (params.decay !== undefined) {
+      const decay = Math.max(0.1, Math.min(10, params.decay));
+      const dampingFreq = this.reverbDamping.frequency.value;
+      this.reverbConvolver.buffer = this.generateImpulseResponse(decay, dampingFreq);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -331,6 +397,33 @@ class AudioEngine {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Generate a stereo impulse response buffer for convolution reverb.
+   * Uses exponentially decaying noise with frequency-dependent decay.
+   */
+  private generateImpulseResponse(decay: number, dampingFreq: number): AudioBuffer {
+    const sampleRate = this.context.sampleRate;
+    const length = Math.floor(sampleRate * decay);
+    const buffer = this.context.createBuffer(2, length, sampleRate);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+
+    // Faster high-frequency decay for more natural sound
+    const dampFactor = Math.max(0.2, dampingFreq / 12000);
+
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      // Exponential decay envelope
+      const envelope = Math.exp(-3 * t / decay) * dampFactor +
+                       Math.exp(-6 * t / decay) * (1 - dampFactor);
+      // Stereo decorrelation with independent noise per channel
+      left[i] = (Math.random() * 2 - 1) * envelope;
+      right[i] = (Math.random() * 2 - 1) * envelope;
+    }
+
+    return buffer;
+  }
 
   private createNoiseSource(): AudioBufferSourceNode {
     const source = this.context.createBufferSource();

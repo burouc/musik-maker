@@ -18,6 +18,8 @@ export interface Track {
   pan: number;
   muted: boolean;
   solo: boolean;
+  /** Reverb send level: 0 (dry) to 1 (full send) */
+  reverbSend: number;
 }
 
 export interface Pattern {
@@ -76,6 +78,18 @@ export interface PianoRollData {
   notes: PianoNote[];
 }
 
+/** Reverb parameters for a mixer channel */
+export interface ReverbSettings {
+  /** Send level: 0 (dry) to 1 (full send) */
+  send: number;
+  /** Decay time in seconds (0.1–10) */
+  decay: number;
+  /** Pre-delay in seconds (0–0.1) */
+  preDelay: number;
+  /** High-frequency damping: 0 (bright) to 1 (dark) */
+  damping: number;
+}
+
 export type PlaybackMode = 'pattern' | 'song';
 
 export interface SequencerState {
@@ -92,4 +106,6 @@ export interface SequencerState {
   currentMeasure: number;
   /** Master channel volume (0–1) */
   masterVolume: number;
+  /** Master reverb effect settings */
+  masterReverb: ReverbSettings;
 }

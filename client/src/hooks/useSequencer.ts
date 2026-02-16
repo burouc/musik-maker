@@ -8,6 +8,7 @@ import type {
   PlaybackMode,
   SequencerState,
   PianoNote,
+  ReverbSettings,
 } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
@@ -28,12 +29,12 @@ const DEFAULT_VELOCITY = 0.8;
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
-    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
-    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
-    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
-    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
   ];
 }
 
@@ -72,6 +73,7 @@ const INITIAL_STATE: SequencerState = {
   playbackMode: 'pattern',
   currentMeasure: -1,
   masterVolume: 0.8,
+  masterReverb: { send: 0, decay: 2, preDelay: 0.01, damping: 0.3 },
 };
 
 function useSequencer() {
@@ -794,6 +796,37 @@ function useSequencer() {
     setState((prev) => ({ ...prev, masterVolume: clamped }));
   }, []);
 
+  const setTrackReverbSend = useCallback(
+    (trackId: InstrumentName, send: number) => {
+      const clamped = Math.max(0, Math.min(1, send));
+      audioEngine.current.setChannelReverbSend(trackId, clamped);
+      setState((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
+            ? {
+                ...pattern,
+                tracks: pattern.tracks.map((track) =>
+                  track.id === trackId
+                    ? { ...track, reverbSend: clamped }
+                    : track,
+                ),
+              }
+            : pattern,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const setMasterReverb = useCallback((params: Partial<ReverbSettings>) => {
+    audioEngine.current.setReverbParams(params);
+    setState((prev) => ({
+      ...prev,
+      masterReverb: { ...prev.masterReverb, ...params },
+    }));
+  }, []);
+
   // Derive active pattern tracks for component consumption
   const activePattern = getActivePattern(state);
   const tracks = activePattern?.tracks ?? [];
@@ -834,6 +867,8 @@ function useSequencer() {
     setPlaybackMode,
     setPatternStepCount,
     setMasterVolume,
+    setTrackReverbSend,
+    setMasterReverb,
   };
 }
 

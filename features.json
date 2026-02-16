@@ -232,7 +232,7 @@
           "id": "fx-01",
           "priority": "P0",
           "title": "Reverb (convolution or algorithmic)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "fx-02",

@@ -41,6 +41,8 @@ function App() {
     setPlaybackMode,
     setPatternStepCount,
     setMasterVolume,
+    setTrackReverbSend,
+    setMasterReverb,
     activePattern,
     audioEngine,
   } = useSequencer();
@@ -85,6 +87,7 @@ function App() {
       <Mixer
         tracks={tracks}
         masterVolume={state.masterVolume}
+        masterReverb={state.masterReverb}
         audioEngine={audioEngine}
         onSetVolume={setTrackVolume}
         onSetPan={setTrackPan}
@@ -92,6 +95,8 @@ function App() {
         onToggleSolo={toggleSolo}
         onClearTrack={clearTrack}
         onSetMasterVolume={setMasterVolume}
+        onSetReverbSend={setTrackReverbSend}
+        onSetMasterReverb={setMasterReverb}
       />
 
       {activePattern && (
