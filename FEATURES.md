@@ -29,7 +29,7 @@ Features are grouped by category. Each item is marked with a priority:
 
 - [ ] **[P0]** Variable step count per pattern (1–64 steps, not locked to 16)
 - [ ] **[P0]** Per-step velocity editing (click-drag to set hit strength)
-- [ ] **[P0]** Per-step pitch shifting for drum instruments
+- [x] **[P0]** Per-step pitch shifting for drum instruments
 - [ ] **[P1]** Swing/shuffle control (adjustable percentage)
 - [ ] **[P1]** Ghost notes (reduced velocity visual distinction)
 - [ ] **[P1]** Step sequencer zoom (fit more/fewer steps on screen)
