@@ -1257,6 +1257,18 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
+.arrangement-block-span.dragging {
+  opacity: 0.4;
+}
+
+.arrangement-block-span[draggable='true'] {
+  cursor: grab;
+}
+
+.arrangement-block-span[draggable='true']:active {
+  cursor: grabbing;
+}
+
 /* =========================================================================
    Piano Roll
    ========================================================================= */

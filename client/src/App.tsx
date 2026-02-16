@@ -37,6 +37,7 @@ function App() {
     toggleArrangementBlock,
     placeArrangementBlock,
     resizeArrangementBlock,
+    moveArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,
@@ -181,6 +182,7 @@ function App() {
         onToggleBlock={toggleArrangementBlock}
         onPlaceBlock={placeArrangementBlock}
         onResizeBlock={resizeArrangementBlock}
+        onMoveBlock={moveArrangementBlock}
         onToggleTrackMute={toggleArrangementTrackMute}
         onAddTrack={addArrangementTrack}
         onRemoveTrack={removeArrangementTrack}

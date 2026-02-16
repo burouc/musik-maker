@@ -882,6 +882,60 @@ function useSequencer() {
     [],
   );
 
+  const moveArrangementBlock = useCallback(
+    (
+      fromTrackId: string,
+      fromStartMeasure: number,
+      toTrackId: string,
+      toStartMeasure: number,
+    ) => {
+      if (fromTrackId === toTrackId && fromStartMeasure === toStartMeasure) return;
+      setState((prev) => {
+        // Find the source block
+        const srcTrack = prev.arrangement.find((t) => t.id === fromTrackId);
+        const block = srcTrack?.blocks.find((b) => b.startMeasure === fromStartMeasure);
+        if (!block) return prev;
+
+        const movedBlock: ArrangementBlock = {
+          ...block,
+          startMeasure: toStartMeasure,
+        };
+
+        return {
+          ...prev,
+          arrangement: prev.arrangement.map((arrTrack) => {
+            if (arrTrack.id === fromTrackId && arrTrack.id === toTrackId) {
+              // Same track: remove old, add new
+              return {
+                ...arrTrack,
+                blocks: [
+                  ...arrTrack.blocks.filter((b) => b.startMeasure !== fromStartMeasure),
+                  movedBlock,
+                ],
+              };
+            }
+            if (arrTrack.id === fromTrackId) {
+              // Remove from source track
+              return {
+                ...arrTrack,
+                blocks: arrTrack.blocks.filter((b) => b.startMeasure !== fromStartMeasure),
+              };
+            }
+            if (arrTrack.id === toTrackId) {
+              // Add to destination track
+              return {
+                ...arrTrack,
+                blocks: [...arrTrack.blocks, movedBlock],
+              };
+            }
+            return arrTrack;
+          }),
+        };
+      });
+    },
+    [],
+  );
+
   const toggleArrangementTrackMute = useCallback((arrTrackId: string) => {
     setState((prev) => ({
       ...prev,
@@ -1433,6 +1487,7 @@ function useSequencer() {
     toggleArrangementBlock,
     placeArrangementBlock,
     resizeArrangementBlock,
+    moveArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,

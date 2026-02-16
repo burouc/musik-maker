@@ -12,6 +12,7 @@ interface ArrangementProps {
   onToggleBlock: (arrTrackId: string, measure: number, patternId: string) => void;
   onPlaceBlock: (arrTrackId: string, measure: number, patternId: string) => void;
   onResizeBlock: (arrTrackId: string, startMeasure: number, newDuration: number) => void;
+  onMoveBlock: (fromTrackId: string, fromStartMeasure: number, toTrackId: string, toStartMeasure: number) => void;
   onToggleTrackMute: (arrTrackId: string) => void;
   onAddTrack: () => void;
   onRemoveTrack: (arrTrackId: string) => void;
@@ -36,6 +37,7 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
   onToggleBlock,
   onPlaceBlock,
   onResizeBlock,
+  onMoveBlock,
   onToggleTrackMute,
   onAddTrack,
   onRemoveTrack,
@@ -43,6 +45,26 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
   onSetPlaybackMode,
 }) {
   const [dropTarget, setDropTarget] = useState<{ trackId: string; measure: number } | null>(null);
+
+  // --- Move/drag state ---
+  const [draggingBlock, setDraggingBlock] = useState<{ trackId: string; startMeasure: number } | null>(null);
+
+  const handleBlockDragStart = useCallback((
+    e: React.DragEvent,
+    trackId: string,
+    block: ArrangementBlock,
+  ) => {
+    e.dataTransfer.setData(
+      'application/x-block-move',
+      JSON.stringify({ trackId, startMeasure: block.startMeasure }),
+    );
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingBlock({ trackId, startMeasure: block.startMeasure });
+  }, []);
+
+  const handleBlockDragEnd = useCallback(() => {
+    setDraggingBlock(null);
+  }, []);
 
   // --- Resize state ---
   const [resizing, setResizing] = useState<{
@@ -54,9 +76,14 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
   const resizeStartX = useRef(0);
 
   const handleDragOver = useCallback((e: React.DragEvent, trackId: string, measure: number) => {
-    if (e.dataTransfer.types.includes('application/x-pattern-id')) {
+    if (
+      e.dataTransfer.types.includes('application/x-pattern-id') ||
+      e.dataTransfer.types.includes('application/x-block-move')
+    ) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
+      e.dataTransfer.dropEffect = e.dataTransfer.types.includes('application/x-block-move')
+        ? 'move'
+        : 'copy';
       setDropTarget({ trackId, measure });
     }
   }, []);
@@ -67,12 +94,19 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
 
   const handleDrop = useCallback((e: React.DragEvent, trackId: string, measure: number) => {
     e.preventDefault();
+    const moveData = e.dataTransfer.getData('application/x-block-move');
+    if (moveData) {
+      const { trackId: fromTrackId, startMeasure } = JSON.parse(moveData);
+      onMoveBlock(fromTrackId, startMeasure, trackId, measure);
+      setDropTarget(null);
+      return;
+    }
     const patternId = e.dataTransfer.getData('application/x-pattern-id');
     if (patternId) {
       onPlaceBlock(trackId, measure, patternId);
     }
     setDropTarget(null);
-  }, [onPlaceBlock]);
+  }, [onPlaceBlock, onMoveBlock]);
 
   // --- Resize handlers ---
   const handleResizeStart = useCallback((
@@ -240,12 +274,17 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
                       currentMeasure >= m &&
                       currentMeasure < m + duration;
 
+                    const isDragging =
+                      draggingBlock?.trackId === arrTrack.id &&
+                      draggingBlock?.startMeasure === m;
+
                     return (
                       <div
                         key={m}
+                        draggable
                         className={`arrangement-cell filled arrangement-block-span${
                           m % 4 === 0 ? ' bar-start' : ''
-                        }${isCurrent ? ' current' : ''}`}
+                        }${isCurrent ? ' current' : ''}${isDragging ? ' dragging' : ''}`}
                         style={{
                           '--block-color': pattern.color,
                           width: `${width}px`,
@@ -254,6 +293,13 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
                         onClick={() =>
                           onToggleBlock(arrTrack.id, m, activePatternId)
                         }
+                        onDragStart={(e) =>
+                          handleBlockDragStart(e, arrTrack.id, block)
+                        }
+                        onDragEnd={handleBlockDragEnd}
+                        onDragOver={(e) => handleDragOver(e, arrTrack.id, m)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, arrTrack.id, m)}
                         title={pattern.name}
                       >
                         <span className="arrangement-block-label">
