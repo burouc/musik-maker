@@ -1,15 +1,17 @@
 import React from "react";
+import type { PlaybackMode } from "../types";
 
 interface TransportControlsProps {
   isPlaying: boolean;
   bpm: number;
+  playbackMode: PlaybackMode;
   onTogglePlay: () => void;
   onBpmChange: (bpm: number) => void;
   onClearAll: () => void;
 }
 
 const TransportControls: React.FC<TransportControlsProps> = React.memo(
-  ({ isPlaying, bpm, onTogglePlay, onBpmChange, onClearAll }) => {
+  ({ isPlaying, bpm, playbackMode, onTogglePlay, onBpmChange, onClearAll }) => {
     const handleBpmChange = (
       e: React.ChangeEvent<HTMLInputElement>
     ) => {
@@ -25,6 +27,10 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
         >
           {isPlaying ? "\u23F9 Stop" : "\u25B6 Play"}
         </button>
+
+        <span className="transport-mode-badge">
+          {playbackMode === 'pattern' ? 'PAT' : 'SONG'}
+        </span>
 
         <div className="bpm-control">
           <label>BPM: {bpm}</label>

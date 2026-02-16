@@ -1,24 +1,71 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { InstrumentName, Track, SequencerState } from '../types';
+import type {
+  InstrumentName,
+  Track,
+  Pattern,
+  ArrangementTrack,
+  ArrangementBlock,
+  PlaybackMode,
+  SequencerState,
+} from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
 const TOTAL_STEPS = 16;
 
-const DEFAULT_TRACKS: Track[] = [
-  { id: 'kick', name: 'Kick', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-  { id: 'snare', name: 'Snare', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-  { id: 'hihat', name: 'Hi-Hat', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-  { id: 'clap', name: 'Clap', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-  { id: 'openhat', name: 'Open Hat', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-  { id: 'percussion', name: 'Percussion', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+const PATTERN_COLORS = [
+  '#e94560',
+  '#f5a623',
+  '#4ecdc4',
+  '#a855f7',
+  '#3b82f6',
+  '#22c55e',
+  '#ec4899',
+  '#f97316',
 ];
 
+function createDefaultTracks(): Track[] {
+  return [
+    { id: 'kick', name: 'Kick', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'snare', name: 'Snare', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'clap', name: 'Clap', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'openhat', name: 'Open Hat', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'percussion', name: 'Percussion', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+  ];
+}
+
+function createPattern(index: number): Pattern {
+  return {
+    id: `pattern-${Date.now()}-${index}`,
+    name: `Pattern ${index + 1}`,
+    color: PATTERN_COLORS[index % PATTERN_COLORS.length],
+    tracks: createDefaultTracks(),
+  };
+}
+
+const DEFAULT_ARRANGEMENT_TRACKS: ArrangementTrack[] = Array.from(
+  { length: 4 },
+  (_, i) => ({
+    id: `arr-track-${i}`,
+    name: `Track ${i + 1}`,
+    blocks: [],
+    muted: false,
+  }),
+);
+
+const firstPattern = createPattern(0);
+
 const INITIAL_STATE: SequencerState = {
-  tracks: DEFAULT_TRACKS,
+  patterns: [firstPattern],
+  activePatternId: firstPattern.id,
+  arrangement: DEFAULT_ARRANGEMENT_TRACKS,
+  arrangementLength: 16,
   bpm: 120,
   currentStep: -1,
   isPlaying: false,
   totalSteps: TOTAL_STEPS,
+  playbackMode: 'pattern',
+  currentMeasure: -1,
 };
 
 function useSequencer() {
@@ -28,10 +75,16 @@ function useSequencer() {
   const timerRef = useRef<number | null>(null);
   const stateRef = useRef<SequencerState>(state);
 
-  // Keep stateRef in sync with state so the interval callback always has fresh data.
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Helper: get the currently active pattern from state
+  const getActivePattern = useCallback(
+    (s: SequencerState): Pattern | undefined =>
+      s.patterns.find((p) => p.id === s.activePatternId),
+    [],
+  );
 
   // -----------------------------------------------------------------------
   // Playback loop
@@ -42,24 +95,78 @@ function useSequencer() {
 
       timerRef.current = window.setInterval(() => {
         setState((prev) => {
-          const nextStep = (prev.currentStep + 1) % prev.totalSteps;
+          const current = stateRef.current;
 
-          // Determine which tracks should be audible on this step.
-          const currentState = stateRef.current;
-          const anySoloed = currentState.tracks.some((t) => t.solo);
+          if (current.playbackMode === 'pattern') {
+            // --- Pattern mode: loop through current pattern ---
+            const pattern = current.patterns.find(
+              (p) => p.id === current.activePatternId,
+            );
+            if (!pattern) return prev;
 
-          for (const track of currentState.tracks) {
-            if (!track.steps[nextStep]) continue;
+            const nextStep = (prev.currentStep + 1) % prev.totalSteps;
+            const anySoloed = pattern.tracks.some((t) => t.solo);
 
-            const effectivelyMuted =
-              track.muted || (anySoloed && !track.solo);
-
-            if (!effectivelyMuted) {
-              audioEngine.current.playSound(track.id, track.volume);
+            for (const track of pattern.tracks) {
+              if (!track.steps[nextStep]) continue;
+              const effectivelyMuted =
+                track.muted || (anySoloed && !track.solo);
+              if (!effectivelyMuted) {
+                audioEngine.current.playSound(track.id, track.volume);
+              }
             }
-          }
 
-          return { ...prev, currentStep: nextStep };
+            return { ...prev, currentStep: nextStep };
+          } else {
+            // --- Song mode: play through the arrangement ---
+            const nextStep = (prev.currentStep + 1) % prev.totalSteps;
+            let nextMeasure = prev.currentMeasure;
+
+            // Advance to next measure when we wrap around to step 0
+            if (nextStep === 0) {
+              nextMeasure = prev.currentMeasure + 1;
+              if (nextMeasure >= prev.arrangementLength) {
+                // Song finished - stop playback
+                return {
+                  ...prev,
+                  isPlaying: false,
+                  currentStep: -1,
+                  currentMeasure: -1,
+                };
+              }
+            }
+
+            // Find all patterns playing at this measure
+            for (const arrTrack of current.arrangement) {
+              if (arrTrack.muted) continue;
+
+              for (const block of arrTrack.blocks) {
+                if (block.startMeasure === nextMeasure) {
+                  const pattern = current.patterns.find(
+                    (p) => p.id === block.patternId,
+                  );
+                  if (!pattern) continue;
+
+                  const anySoloed = pattern.tracks.some((t) => t.solo);
+
+                  for (const track of pattern.tracks) {
+                    if (!track.steps[nextStep]) continue;
+                    const effectivelyMuted =
+                      track.muted || (anySoloed && !track.solo);
+                    if (!effectivelyMuted) {
+                      audioEngine.current.playSound(track.id, track.volume);
+                    }
+                  }
+                }
+              }
+            }
+
+            return {
+              ...prev,
+              currentStep: nextStep,
+              currentMeasure: nextMeasure,
+            };
+          }
         });
       }, intervalMs);
     } else {
@@ -78,22 +185,98 @@ function useSequencer() {
   }, [state.isPlaying, state.bpm]);
 
   // -----------------------------------------------------------------------
-  // Actions
+  // Pattern actions
+  // -----------------------------------------------------------------------
+
+  const addPattern = useCallback(() => {
+    setState((prev) => {
+      const newPattern = createPattern(prev.patterns.length);
+      return {
+        ...prev,
+        patterns: [...prev.patterns, newPattern],
+        activePatternId: newPattern.id,
+      };
+    });
+  }, []);
+
+  const selectPattern = useCallback((patternId: string) => {
+    setState((prev) => ({ ...prev, activePatternId: patternId }));
+  }, []);
+
+  const deletePattern = useCallback((patternId: string) => {
+    setState((prev) => {
+      if (prev.patterns.length <= 1) return prev;
+      const filtered = prev.patterns.filter((p) => p.id !== patternId);
+      const newActiveId =
+        prev.activePatternId === patternId
+          ? filtered[0].id
+          : prev.activePatternId;
+      // Also remove from arrangement
+      const updatedArrangement = prev.arrangement.map((arrTrack) => ({
+        ...arrTrack,
+        blocks: arrTrack.blocks.filter((b) => b.patternId !== patternId),
+      }));
+      return {
+        ...prev,
+        patterns: filtered,
+        activePatternId: newActiveId,
+        arrangement: updatedArrangement,
+      };
+    });
+  }, []);
+
+  const renamePattern = useCallback((patternId: string, name: string) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((p) =>
+        p.id === patternId ? { ...p, name } : p,
+      ),
+    }));
+  }, []);
+
+  const duplicatePattern = useCallback((patternId: string) => {
+    setState((prev) => {
+      const source = prev.patterns.find((p) => p.id === patternId);
+      if (!source) return prev;
+      const newPattern: Pattern = {
+        ...source,
+        id: `pattern-${Date.now()}-dup`,
+        name: `${source.name} (copy)`,
+        color: PATTERN_COLORS[prev.patterns.length % PATTERN_COLORS.length],
+        tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps] })),
+      };
+      return {
+        ...prev,
+        patterns: [...prev.patterns, newPattern],
+        activePatternId: newPattern.id,
+      };
+    });
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Track step actions (operate on active pattern)
   // -----------------------------------------------------------------------
 
   const toggleStep = useCallback(
     (trackId: InstrumentName, stepIndex: number) => {
       setState((prev) => ({
         ...prev,
-        tracks: prev.tracks.map((track) =>
-          track.id === trackId
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
             ? {
-                ...track,
-                steps: track.steps.map((v, i) =>
-                  i === stepIndex ? !v : v,
+                ...pattern,
+                tracks: pattern.tracks.map((track) =>
+                  track.id === trackId
+                    ? {
+                        ...track,
+                        steps: track.steps.map((v, i) =>
+                          i === stepIndex ? !v : v,
+                        ),
+                      }
+                    : track,
                 ),
               }
-            : track,
+            : pattern,
         ),
       }));
     },
@@ -112,6 +295,11 @@ function useSequencer() {
         ...prev,
         isPlaying: nextPlaying,
         currentStep: nextPlaying ? prev.currentStep : -1,
+        currentMeasure: nextPlaying
+          ? prev.playbackMode === 'song'
+            ? -1
+            : prev.currentMeasure
+          : -1,
       };
     });
   }, []);
@@ -127,10 +315,17 @@ function useSequencer() {
     (trackId: InstrumentName, volume: number) => {
       setState((prev) => ({
         ...prev,
-        tracks: prev.tracks.map((track) =>
-          track.id === trackId
-            ? { ...track, volume: Math.max(0, Math.min(1, volume)) }
-            : track,
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
+            ? {
+                ...pattern,
+                tracks: pattern.tracks.map((track) =>
+                  track.id === trackId
+                    ? { ...track, volume: Math.max(0, Math.min(1, volume)) }
+                    : track,
+                ),
+              }
+            : pattern,
         ),
       }));
     },
@@ -140,8 +335,17 @@ function useSequencer() {
   const toggleMute = useCallback((trackId: InstrumentName) => {
     setState((prev) => ({
       ...prev,
-      tracks: prev.tracks.map((track) =>
-        track.id === trackId ? { ...track, muted: !track.muted } : track,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              tracks: pattern.tracks.map((track) =>
+                track.id === trackId
+                  ? { ...track, muted: !track.muted }
+                  : track,
+              ),
+            }
+          : pattern,
       ),
     }));
   }, []);
@@ -149,8 +353,17 @@ function useSequencer() {
   const toggleSolo = useCallback((trackId: InstrumentName) => {
     setState((prev) => ({
       ...prev,
-      tracks: prev.tracks.map((track) =>
-        track.id === trackId ? { ...track, solo: !track.solo } : track,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              tracks: pattern.tracks.map((track) =>
+                track.id === trackId
+                  ? { ...track, solo: !track.solo }
+                  : track,
+              ),
+            }
+          : pattern,
       ),
     }));
   }, []);
@@ -158,10 +371,17 @@ function useSequencer() {
   const clearTrack = useCallback((trackId: InstrumentName) => {
     setState((prev) => ({
       ...prev,
-      tracks: prev.tracks.map((track) =>
-        track.id === trackId
-          ? { ...track, steps: Array(prev.totalSteps).fill(false) }
-          : track,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              tracks: pattern.tracks.map((track) =>
+                track.id === trackId
+                  ? { ...track, steps: Array(prev.totalSteps).fill(false) }
+                  : track,
+              ),
+            }
+          : pattern,
       ),
     }));
   }, []);
@@ -171,15 +391,126 @@ function useSequencer() {
       ...prev,
       isPlaying: false,
       currentStep: -1,
-      tracks: prev.tracks.map((track) => ({
-        ...track,
-        steps: Array(prev.totalSteps).fill(false),
-      })),
+      currentMeasure: -1,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              tracks: pattern.tracks.map((track) => ({
+                ...track,
+                steps: Array(prev.totalSteps).fill(false),
+              })),
+            }
+          : pattern,
+      ),
     }));
   }, []);
 
+  // -----------------------------------------------------------------------
+  // Arrangement actions
+  // -----------------------------------------------------------------------
+
+  const toggleArrangementBlock = useCallback(
+    (arrTrackId: string, measure: number, patternId: string) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+
+          const existingIndex = arrTrack.blocks.findIndex(
+            (b) => b.startMeasure === measure,
+          );
+
+          if (existingIndex !== -1) {
+            // If it's the same pattern, remove the block
+            if (arrTrack.blocks[existingIndex].patternId === patternId) {
+              return {
+                ...arrTrack,
+                blocks: arrTrack.blocks.filter((_, i) => i !== existingIndex),
+              };
+            }
+            // Different pattern - replace
+            return {
+              ...arrTrack,
+              blocks: arrTrack.blocks.map((b, i) =>
+                i === existingIndex ? { ...b, patternId } : b,
+              ),
+            };
+          }
+
+          // Add new block
+          const newBlock: ArrangementBlock = { patternId, startMeasure: measure };
+          return {
+            ...arrTrack,
+            blocks: [...arrTrack.blocks, newBlock],
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const toggleArrangementTrackMute = useCallback((arrTrackId: string) => {
+    setState((prev) => ({
+      ...prev,
+      arrangement: prev.arrangement.map((arrTrack) =>
+        arrTrack.id === arrTrackId
+          ? { ...arrTrack, muted: !arrTrack.muted }
+          : arrTrack,
+      ),
+    }));
+  }, []);
+
+  const addArrangementTrack = useCallback(() => {
+    setState((prev) => {
+      const newTrack: ArrangementTrack = {
+        id: `arr-track-${Date.now()}`,
+        name: `Track ${prev.arrangement.length + 1}`,
+        blocks: [],
+        muted: false,
+      };
+      return {
+        ...prev,
+        arrangement: [...prev.arrangement, newTrack],
+      };
+    });
+  }, []);
+
+  const removeArrangementTrack = useCallback((arrTrackId: string) => {
+    setState((prev) => {
+      if (prev.arrangement.length <= 1) return prev;
+      return {
+        ...prev,
+        arrangement: prev.arrangement.filter((t) => t.id !== arrTrackId),
+      };
+    });
+  }, []);
+
+  const setArrangementLength = useCallback((length: number) => {
+    setState((prev) => ({
+      ...prev,
+      arrangementLength: Math.max(4, Math.min(64, length)),
+    }));
+  }, []);
+
+  const setPlaybackMode = useCallback((mode: PlaybackMode) => {
+    setState((prev) => ({
+      ...prev,
+      playbackMode: mode,
+      isPlaying: false,
+      currentStep: -1,
+      currentMeasure: -1,
+    }));
+  }, []);
+
+  // Derive active pattern tracks for component consumption
+  const activePattern = getActivePattern(state);
+  const tracks = activePattern?.tracks ?? [];
+
   return {
     state,
+    tracks,
+    activePattern,
     toggleStep,
     togglePlay,
     setBpm,
@@ -188,6 +519,17 @@ function useSequencer() {
     toggleSolo,
     clearTrack,
     clearAll,
+    addPattern,
+    selectPattern,
+    deletePattern,
+    renamePattern,
+    duplicatePattern,
+    toggleArrangementBlock,
+    toggleArrangementTrackMute,
+    addArrangementTrack,
+    removeArrangementTrack,
+    setArrangementLength,
+    setPlaybackMode,
   };
 }
 
