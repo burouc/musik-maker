@@ -1,8 +1,14 @@
-import React, { useState, useCallback, useRef } from 'react';
-import type { AutomationLane, AutomationTarget } from '../types';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
+import type { AutomationLane, AutomationTarget, InstrumentName, ChannelAutomationParam } from '../types';
 
 /** Drawing tool mode for automation lanes */
 type DrawMode = 'point' | 'freehand' | 'line' | 'erase';
+
+/** Minimal track info needed for building automation target list */
+interface TrackInfo {
+  id: string;
+  name: string;
+}
 
 interface AutomationLanesProps {
   lanes: AutomationLane[];
@@ -11,6 +17,8 @@ interface AutomationLanesProps {
   currentStep: number;
   isPlaying: boolean;
   playbackMode: 'pattern' | 'song';
+  drumTracks: TrackInfo[];
+  sampleTracks: TrackInfo[];
   onAddLane: (target: AutomationTarget) => void;
   onRemoveLane: (laneId: string) => void;
   onToggleLane: (laneId: string) => void;
@@ -19,7 +27,7 @@ interface AutomationLanesProps {
   onClearLane: (laneId: string) => void;
 }
 
-const AVAILABLE_TARGETS: { value: AutomationTarget; label: string }[] = [
+const MASTER_TARGETS: { value: AutomationTarget; label: string }[] = [
   { value: 'masterVolume', label: 'Master Volume' },
   { value: 'masterFilterCutoff', label: 'Filter Cutoff' },
   { value: 'masterFilterResonance', label: 'Filter Resonance' },
@@ -27,6 +35,14 @@ const AVAILABLE_TARGETS: { value: AutomationTarget; label: string }[] = [
   { value: 'masterReverbDamping', label: 'Reverb Damping' },
   { value: 'masterDelayFeedback', label: 'Delay Feedback' },
   { value: 'masterDelayMix', label: 'Delay Mix' },
+];
+
+const CHANNEL_PARAMS: { param: ChannelAutomationParam; label: string }[] = [
+  { param: 'volume', label: 'Volume' },
+  { param: 'pan', label: 'Pan' },
+  { param: 'reverbSend', label: 'Reverb Send' },
+  { param: 'delaySend', label: 'Delay Send' },
+  { param: 'filterSend', label: 'Filter Send' },
 ];
 
 /** Cell width must match arrangement grid (48px cell + 2px gap) */
@@ -57,6 +73,8 @@ const AutomationLanes = React.memo<AutomationLanesProps>(function AutomationLane
   currentStep,
   isPlaying,
   playbackMode,
+  drumTracks,
+  sampleTracks,
   onAddLane,
   onRemoveLane,
   onToggleLane,
@@ -68,8 +86,40 @@ const AutomationLanes = React.memo<AutomationLanesProps>(function AutomationLane
   const [collapsed, setCollapsed] = useState(false);
   const [drawMode, setDrawMode] = useState<DrawMode>('point');
 
+  // Build full list of available targets including per-channel params
+  const allTargets = useMemo(() => {
+    const targets: { value: AutomationTarget; label: string; group: string }[] = [];
+    // Master targets
+    for (const t of MASTER_TARGETS) {
+      targets.push({ ...t, group: 'Master' });
+    }
+    // Per-drum-channel targets
+    for (const track of drumTracks) {
+      const name = track.name;
+      for (const { param, label } of CHANNEL_PARAMS) {
+        targets.push({
+          value: `drum:${track.id}:${param}` as AutomationTarget,
+          label: `${name} ${label}`,
+          group: name,
+        });
+      }
+    }
+    // Per-sample-track targets
+    for (const track of sampleTracks) {
+      const name = track.name;
+      for (const { param, label } of CHANNEL_PARAMS) {
+        targets.push({
+          value: `sample:${track.id}:${param}` as AutomationTarget,
+          label: `${name} ${label}`,
+          group: name,
+        });
+      }
+    }
+    return targets;
+  }, [drumTracks, sampleTracks]);
+
   const usedTargets = new Set(lanes.map((l) => l.target));
-  const availableTargets = AVAILABLE_TARGETS.filter((t) => !usedTargets.has(t.value));
+  const availableTargets = allTargets.filter((t) => !usedTargets.has(t.value));
 
   const handleAddLane = useCallback(() => {
     if (availableTargets.length > 0) {
@@ -109,9 +159,19 @@ const AutomationLanes = React.memo<AutomationLanesProps>(function AutomationLane
                   value={selectedTarget}
                   onChange={(e) => setSelectedTarget(e.target.value as AutomationTarget)}
                 >
-                  {availableTargets.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
+                  {(() => {
+                    const groups: Record<string, typeof availableTargets> = {};
+                    for (const t of availableTargets) {
+                      (groups[t.group] ??= []).push(t);
+                    }
+                    return Object.entries(groups).map(([group, targets]) => (
+                      <optgroup key={group} label={group}>
+                        {targets.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </optgroup>
+                    ));
+                  })()}
                 </select>
                 <button className="automation-add-btn" onClick={handleAddLane}>
                   + Lane

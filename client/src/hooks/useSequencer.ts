@@ -159,6 +159,56 @@ function useSequencer() {
   // Helper: apply automation value to the audio engine
   const applyAutomation = useCallback(
     (target: AutomationTarget, normalizedValue: number) => {
+      // Handle per-channel targets: "drum:kick:volume", "sample:trackId:pan", etc.
+      if (target.startsWith('drum:') || target.startsWith('sample:')) {
+        const parts = target.split(':');
+        const channelType = parts[0] as 'drum' | 'sample';
+        const channelId = parts[1];
+        const param = parts[2] as import('../types').ChannelAutomationParam;
+
+        if (channelType === 'drum') {
+          const instrument = channelId as InstrumentName;
+          switch (param) {
+            case 'volume':
+              audioEngine.current.setChannelVolume(instrument, normalizedValue);
+              break;
+            case 'pan':
+              // Map 0–1 to -1–+1
+              audioEngine.current.setChannelPan(instrument, normalizedValue * 2 - 1);
+              break;
+            case 'reverbSend':
+              audioEngine.current.setChannelReverbSend(instrument, normalizedValue);
+              break;
+            case 'delaySend':
+              audioEngine.current.setChannelDelaySend(instrument, normalizedValue);
+              break;
+            case 'filterSend':
+              audioEngine.current.setChannelFilterSend(instrument, normalizedValue);
+              break;
+          }
+        } else {
+          // sample channel
+          switch (param) {
+            case 'volume':
+              audioEngine.current.setSampleChannelVolume(channelId, normalizedValue);
+              break;
+            case 'pan':
+              audioEngine.current.setSampleChannelPan(channelId, normalizedValue * 2 - 1);
+              break;
+            case 'reverbSend':
+              audioEngine.current.setSampleChannelReverbSend(channelId, normalizedValue);
+              break;
+            case 'delaySend':
+              audioEngine.current.setSampleChannelDelaySend(channelId, normalizedValue);
+              break;
+            case 'filterSend':
+              audioEngine.current.setSampleChannelFilterSend(channelId, normalizedValue);
+              break;
+          }
+        }
+        return;
+      }
+
       switch (target) {
         case 'masterVolume':
           audioEngine.current.setMasterVolume(normalizedValue);
@@ -1574,7 +1624,7 @@ function useSequencer() {
   // -----------------------------------------------------------------------
 
   /** Parameter display names */
-  const AUTOMATION_TARGET_NAMES: Record<AutomationTarget, string> = {
+  const MASTER_TARGET_NAMES: Record<string, string> = {
     masterVolume: 'Master Volume',
     masterFilterCutoff: 'Filter Cutoff',
     masterFilterResonance: 'Filter Resonance',
@@ -1584,6 +1634,37 @@ function useSequencer() {
     masterDelayMix: 'Delay Mix',
   };
 
+  const PARAM_LABELS: Record<string, string> = {
+    volume: 'Volume',
+    pan: 'Pan',
+    reverbSend: 'Reverb Send',
+    delaySend: 'Delay Send',
+    filterSend: 'Filter Send',
+  };
+
+  const getAutomationTargetName = useCallback((target: AutomationTarget): string => {
+    if (MASTER_TARGET_NAMES[target]) return MASTER_TARGET_NAMES[target];
+    const parts = target.split(':');
+    if (parts.length === 3) {
+      const [type, id, param] = parts;
+      const paramLabel = PARAM_LABELS[param] ?? param;
+      if (type === 'drum') {
+        // Capitalize instrument name
+        const name = id.charAt(0).toUpperCase() + id.slice(1);
+        return `${name} ${paramLabel}`;
+      }
+      if (type === 'sample') {
+        // Find sample track name from state
+        const current = stateRef.current;
+        const activePattern = current.patterns.find((p) => p.id === current.activePatternId);
+        const sTrack = activePattern?.sampleTracks.find((t) => t.id === id);
+        const name = sTrack?.name ?? id;
+        return `${name} ${paramLabel}`;
+      }
+    }
+    return target;
+  }, []);
+
   const addAutomationLane = useCallback((target: AutomationTarget) => {
     setState((prev) => {
       // Don't add duplicate lanes for the same target
@@ -1591,7 +1672,7 @@ function useSequencer() {
       const lane: AutomationLane = {
         id: `auto-${Date.now()}-${target}`,
         target,
-        name: AUTOMATION_TARGET_NAMES[target],
+        name: getAutomationTargetName(target),
         points: [],
         enabled: true,
       };
@@ -1600,7 +1681,7 @@ function useSequencer() {
         automationLanes: [...prev.automationLanes, lane],
       };
     });
-  }, []);
+  }, [getAutomationTargetName]);
 
   const removeAutomationLane = useCallback((laneId: string) => {
     setState((prev) => ({

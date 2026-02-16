@@ -225,6 +225,9 @@ export interface SampleTrack {
   filterSend: number;
 }
 
+/** Per-channel automation target format: `${channelType}:${channelId}:${param}` */
+export type ChannelAutomationParam = 'volume' | 'pan' | 'reverbSend' | 'delaySend' | 'filterSend';
+
 /** Automatable parameter targets */
 export type AutomationTarget =
   | 'masterVolume'
@@ -233,7 +236,9 @@ export type AutomationTarget =
   | 'masterReverbDecay'
   | 'masterReverbDamping'
   | 'masterDelayFeedback'
-  | 'masterDelayMix';
+  | 'masterDelayMix'
+  | `drum:${InstrumentName}:${ChannelAutomationParam}`
+  | `sample:${string}:${ChannelAutomationParam}`;
 
 /** A single automation breakpoint */
 export interface AutomationPoint {

@@ -14,6 +14,7 @@ class AudioEngine {
   private context: AudioContext;
   private masterGain: GainNode;
   private noiseBuffer: AudioBuffer;
+  private channelGains: Map<InstrumentName, GainNode> = new Map();
   private panners: Map<InstrumentName, StereoPannerNode> = new Map();
   private channelAnalysers: Map<InstrumentName, AnalyserNode> = new Map();
   private masterAnalyser: AnalyserNode;
@@ -43,6 +44,7 @@ class AudioEngine {
 
   // Sample playback
   private sampleBuffers: Map<string, AudioBuffer> = new Map();
+  private sampleChannelGains: Map<string, GainNode> = new Map();
   private samplePanners: Map<string, StereoPannerNode> = new Map();
   private sampleAnalysers: Map<string, AnalyserNode> = new Map();
   private sampleReverbSendGains: Map<string, GainNode> = new Map();
@@ -124,14 +126,19 @@ class AudioEngine {
     this.filterNode.connect(this.filterReturnGain);
     this.filterReturnGain.connect(this.masterGain);
 
-    // Create a stereo panner + analyser per instrument channel
+    // Create a gain + stereo panner + analyser per instrument channel
     const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion'];
     for (const name of instruments) {
       const analyser = this.context.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.3;
 
+      // Channel gain node for real-time volume automation
+      const channelGain = this.context.createGain();
+      channelGain.gain.value = 1; // unity by default; per-hit volume multiplied at trigger time
+
       const panner = this.context.createStereoPanner();
+      channelGain.connect(panner);
       panner.connect(analyser);
       analyser.connect(this.masterGain);
 
@@ -153,6 +160,7 @@ class AudioEngine {
       panner.connect(filterSendGain);
       filterSendGain.connect(this.filterBus);
 
+      this.channelGains.set(name, channelGain);
       this.panners.set(name, panner);
       this.channelAnalysers.set(name, analyser);
       this.reverbSendGains.set(name, sendGain);
@@ -309,7 +317,7 @@ class AudioEngine {
 
   async playSound(instrument: InstrumentName, volume: number, pitchOffset: number = 0): Promise<void> {
     await this.resume();
-    const output = this.panners.get(instrument) ?? this.masterGain;
+    const output = this.channelGains.get(instrument) ?? this.panners.get(instrument) ?? this.masterGain;
 
     switch (instrument) {
       case 'kick':
@@ -339,6 +347,14 @@ class AudioEngine {
 
   getMasterVolume(): number {
     return this.masterGain.gain.value;
+  }
+
+  /** Set the persistent channel volume (used by automation). */
+  setChannelVolume(instrument: InstrumentName, value: number): void {
+    const gain = this.channelGains.get(instrument);
+    if (gain) {
+      gain.gain.value = Math.max(0, Math.min(1, value));
+    }
   }
 
   setChannelPan(instrument: InstrumentName, value: number): void {
@@ -485,7 +501,7 @@ class AudioEngine {
     return this.sampleBuffers.has(url);
   }
 
-  /** Ensure a sample track channel exists (panner, analyser, send gains). */
+  /** Ensure a sample track channel exists (gain, panner, analyser, send gains). */
   ensureSampleChannel(trackId: string): void {
     if (this.samplePanners.has(trackId)) return;
 
@@ -493,7 +509,12 @@ class AudioEngine {
     analyser.fftSize = 256;
     analyser.smoothingTimeConstant = 0.3;
 
+    // Channel gain node for real-time volume automation
+    const channelGain = this.context.createGain();
+    channelGain.gain.value = 1;
+
     const panner = this.context.createStereoPanner();
+    channelGain.connect(panner);
     panner.connect(analyser);
     analyser.connect(this.masterGain);
 
@@ -512,6 +533,7 @@ class AudioEngine {
     panner.connect(filterSend);
     filterSend.connect(this.filterBus);
 
+    this.sampleChannelGains.set(trackId, channelGain);
     this.samplePanners.set(trackId, panner);
     this.sampleAnalysers.set(trackId, analyser);
     this.sampleReverbSendGains.set(trackId, reverbSend);
@@ -521,11 +543,13 @@ class AudioEngine {
 
   /** Remove a sample track channel. */
   removeSampleChannel(trackId: string): void {
+    this.sampleChannelGains.get(trackId)?.disconnect();
     this.samplePanners.get(trackId)?.disconnect();
     this.sampleAnalysers.get(trackId)?.disconnect();
     this.sampleReverbSendGains.get(trackId)?.disconnect();
     this.sampleDelaySendGains.get(trackId)?.disconnect();
     this.sampleFilterSendGains.get(trackId)?.disconnect();
+    this.sampleChannelGains.delete(trackId);
     this.samplePanners.delete(trackId);
     this.sampleAnalysers.delete(trackId);
     this.sampleReverbSendGains.delete(trackId);
@@ -543,7 +567,7 @@ class AudioEngine {
     this.stopSample(trackId);
 
     this.ensureSampleChannel(trackId);
-    const output = this.samplePanners.get(trackId) ?? this.masterGain;
+    const output = this.sampleChannelGains.get(trackId) ?? this.samplePanners.get(trackId) ?? this.masterGain;
 
     const source = this.context.createBufferSource();
     source.buffer = buffer;
@@ -627,6 +651,14 @@ class AudioEngine {
       this.previewSource.source.disconnect();
       this.previewSource.gain.disconnect();
       this.previewSource = null;
+    }
+  }
+
+  /** Set the persistent channel volume for a sample track (used by automation). */
+  setSampleChannelVolume(trackId: string, value: number): void {
+    const gain = this.sampleChannelGains.get(trackId);
+    if (gain) {
+      gain.gain.value = Math.max(0, Math.min(1, value));
     }
   }
 
