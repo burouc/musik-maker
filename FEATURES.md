@@ -43,7 +43,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [ ] **[P0]** Note deletion (right-click or delete key)
 - [ ] **[P0]** Note selection (click, shift-click, box select)
 - [ ] **[P0]** Move selected notes (drag, arrow keys)
-- [ ] **[P0]** Copy/paste/duplicate notes
+- [x] **[P0]** Copy/paste/duplicate notes
 - [ ] **[P1]** Velocity lane below the piano roll grid
 - [ ] **[P1]** Snap-to-grid with configurable grid resolution (1/4, 1/8, 1/16, 1/32, triplets)
 - [ ] **[P1]** Zoom in/out (horizontal and vertical)
