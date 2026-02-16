@@ -84,7 +84,7 @@ Features are grouped by category. Each item is marked with a priority:
 
 - [ ] **[P0]** Polyphonic subtractive synth with oscillator selection (sine, saw, square, triangle)
 - [ ] **[P0]** ADSR envelope for amplitude (attack, decay, sustain, release)
-- [ ] **[P0]** ADSR envelope for filter cutoff
+- [x] **[P0]** ADSR envelope for filter cutoff
 - [ ] **[P0]** Multiple oscillators with detune and mix
 - [ ] **[P1]** LFO modulation (route to pitch, filter, volume, pan)
 - [ ] **[P1]** Noise oscillator (white, pink)
