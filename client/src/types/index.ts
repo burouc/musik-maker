@@ -182,6 +182,9 @@ export interface SynthSettings {
 /** Supported audio file formats for sample loading */
 export type SampleFormat = 'wav' | 'mp3' | 'ogg';
 
+/** Sample playback mode: one-shot plays once, loop repeats continuously */
+export type SamplePlaybackMode = 'oneshot' | 'loop';
+
 /** A loaded audio sample that can be used as an instrument */
 export interface SampleInstrument {
   /** Unique identifier for this sample */
@@ -201,6 +204,8 @@ export interface SampleTrack {
   name: string;
   /** Reference to a loaded sample instrument */
   sampleId: string | null;
+  /** Playback mode: 'oneshot' plays the sample once, 'loop' repeats it */
+  playbackMode: SamplePlaybackMode;
   /** Per-step velocity: 0 = off, 0.01–1.0 = on with that velocity */
   steps: number[];
   /** Per-step pitch offset in semitones (−12 to +12, default 0) */

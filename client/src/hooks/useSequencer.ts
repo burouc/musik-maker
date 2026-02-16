@@ -4,6 +4,7 @@ import type {
   Track,
   SampleTrack,
   SampleInstrument,
+  SamplePlaybackMode,
   Pattern,
   ArrangementTrack,
   ArrangementBlock,
@@ -172,7 +173,7 @@ function useSequencer() {
                 const sample = current.samples.find((s) => s.id === sTrack.sampleId);
                 if (sample) {
                   const pitchOffset = sTrack.pitches?.[nextStep] ?? 0;
-                  audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * stepVelocity, pitchOffset);
+                  audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * stepVelocity, pitchOffset, sTrack.playbackMode === 'loop');
                 }
               }
             }
@@ -254,7 +255,7 @@ function useSequencer() {
                       const sample = current.samples.find((s) => s.id === sTrack.sampleId);
                       if (sample) {
                         const sPitchOffset = sTrack.pitches?.[nextStep] ?? 0;
-                        audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * sVelocity, sPitchOffset);
+                        audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * sVelocity, sPitchOffset, sTrack.playbackMode === 'loop');
                       }
                     }
                   }
@@ -462,6 +463,9 @@ function useSequencer() {
 
       if (nextPlaying) {
         audioEngine.current.resume();
+      } else {
+        // Stop all looping/active samples when playback stops
+        audioEngine.current.stopAllSamples();
       }
 
       return {
@@ -1032,6 +1036,7 @@ function useSequencer() {
         id: trackId,
         name: `Sample ${pattern.sampleTracks.length + 1}`,
         sampleId: null,
+        playbackMode: 'oneshot',
         steps: Array(pattern.stepCount).fill(0),
         pitches: Array(pattern.stepCount).fill(0),
         volume: 0.8,
@@ -1157,6 +1162,26 @@ function useSequencer() {
     },
     [],
   );
+
+  const setSampleTrackPlaybackMode = useCallback((trackId: string, mode: SamplePlaybackMode) => {
+    // If switching away from loop, stop any active looping source
+    if (mode === 'oneshot') {
+      audioEngine.current.stopSample(trackId);
+    }
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, playbackMode: mode } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
 
   const setSampleTrackVolume = useCallback((trackId: string, volume: number) => {
     setState((prev) => ({
@@ -1364,6 +1389,7 @@ function useSequencer() {
     addSampleTrack,
     removeSampleTrack,
     setSampleTrackSample,
+    setSampleTrackPlaybackMode,
     toggleSampleStep,
     setSampleStepVelocity,
     setSampleStepPitch,

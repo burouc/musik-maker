@@ -48,6 +48,8 @@ class AudioEngine {
   private sampleReverbSendGains: Map<string, GainNode> = new Map();
   private sampleDelaySendGains: Map<string, GainNode> = new Map();
   private sampleFilterSendGains: Map<string, GainNode> = new Map();
+  /** Active looping sources per track, so they can be stopped */
+  private activeSampleSources: Map<string, { source: AudioBufferSourceNode; gain: GainNode }> = new Map();
 
   constructor() {
     this.context = new AudioContext();
@@ -530,10 +532,13 @@ class AudioEngine {
   }
 
   /** Play a loaded sample on a sample track channel. */
-  async playSample(sampleUrl: string, trackId: string, volume: number, pitchOffset: number = 0): Promise<void> {
+  async playSample(sampleUrl: string, trackId: string, volume: number, pitchOffset: number = 0, loop: boolean = false): Promise<void> {
     await this.resume();
     const buffer = this.sampleBuffers.get(sampleUrl);
     if (!buffer) return;
+
+    // Stop any currently playing source on this track (for both oneshot re-triggers and loop restarts)
+    this.stopSample(trackId);
 
     this.ensureSampleChannel(trackId);
     const output = this.samplePanners.get(trackId) ?? this.masterGain;
@@ -541,6 +546,7 @@ class AudioEngine {
     const source = this.context.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.value = this.pitchRatio(pitchOffset);
+    source.loop = loop;
 
     const gain = this.context.createGain();
     gain.gain.value = volume;
@@ -548,6 +554,38 @@ class AudioEngine {
     source.connect(gain);
     gain.connect(output);
     source.start();
+
+    // Track active source so it can be stopped later
+    this.activeSampleSources.set(trackId, { source, gain });
+    source.onended = () => {
+      // Only clean up if this is still the active source
+      const active = this.activeSampleSources.get(trackId);
+      if (active?.source === source) {
+        this.activeSampleSources.delete(trackId);
+      }
+    };
+  }
+
+  /** Stop a currently playing sample on a track. */
+  stopSample(trackId: string): void {
+    const active = this.activeSampleSources.get(trackId);
+    if (active) {
+      try {
+        active.source.stop();
+      } catch {
+        // Already stopped
+      }
+      active.source.disconnect();
+      active.gain.disconnect();
+      this.activeSampleSources.delete(trackId);
+    }
+  }
+
+  /** Stop all active sample sources (e.g. when stopping playback). */
+  stopAllSamples(): void {
+    for (const [trackId] of this.activeSampleSources) {
+      this.stopSample(trackId);
+    }
   }
 
   /** Set pan for a sample track channel. */

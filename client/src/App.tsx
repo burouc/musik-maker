@@ -56,6 +56,7 @@ function App() {
     addSampleTrack,
     removeSampleTrack,
     setSampleTrackSample,
+    setSampleTrackPlaybackMode,
     toggleSampleStep,
     setSampleStepVelocity,
     setSampleStepPitch,
@@ -110,6 +111,7 @@ function App() {
         onSetSampleStepVelocity={setSampleStepVelocity}
         onSetSampleStepPitch={setSampleStepPitch}
         onSetSampleTrackSample={setSampleTrackSample}
+        onSetSampleTrackPlaybackMode={setSampleTrackPlaybackMode}
         onLoadSample={loadSample}
         onAddSampleTrack={addSampleTrack}
         onRemoveSampleTrack={removeSampleTrack}

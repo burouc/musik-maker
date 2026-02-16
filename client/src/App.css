@@ -454,6 +454,7 @@
   align-items: center;
 }
 
+.sample-mode-btn,
 .sample-load-btn,
 .sample-remove-btn {
   width: 18px;
@@ -479,6 +480,16 @@
 
 .sample-remove-btn:hover {
   background: #e94560;
+  color: #fff;
+}
+
+.sample-mode-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sample-mode-btn.loop-active {
+  background: var(--accent);
   color: #fff;
 }
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import type { InstrumentName, Track, SampleTrack, SampleInstrument } from '../types';
+import type { InstrumentName, Track, SampleTrack, SampleInstrument, SamplePlaybackMode } from '../types';
 import { ACCEPTED_SAMPLE_MIME_TYPES } from '../audio/AudioEngine';
 
 interface StepRowProps {
@@ -145,6 +145,7 @@ interface SampleStepRowProps {
   onSetStepVelocity: (trackId: string, stepIndex: number, velocity: number) => void;
   onSetStepPitch: (trackId: string, stepIndex: number, pitch: number) => void;
   onSetSample: (trackId: string, sampleId: string | null) => void;
+  onSetPlaybackMode: (trackId: string, mode: SamplePlaybackMode) => void;
   onLoadSample: (file: File) => Promise<SampleInstrument | null>;
   onRemoveTrack: (trackId: string) => void;
 }
@@ -158,6 +159,7 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
   onSetStepVelocity,
   onSetStepPitch,
   onSetSample,
+  onSetPlaybackMode,
   onLoadSample,
   onRemoveTrack,
 }) {
@@ -247,6 +249,13 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
           {currentSample?.name ?? track.name}
         </span>
         <span className="sample-track-controls">
+          <button
+            className={`sample-mode-btn${track.playbackMode === 'loop' ? ' loop-active' : ''}`}
+            onClick={() => onSetPlaybackMode(track.id, track.playbackMode === 'oneshot' ? 'loop' : 'oneshot')}
+            title={track.playbackMode === 'oneshot' ? 'One-shot (click for loop)' : 'Looping (click for one-shot)'}
+          >
+            {track.playbackMode === 'loop' ? '⟳' : '▶'}
+          </button>
           <button
             className="sample-load-btn"
             onClick={() => fileInputRef.current?.click()}
@@ -339,6 +348,7 @@ interface StepSequencerProps {
   onSetSampleStepVelocity: (trackId: string, stepIndex: number, velocity: number) => void;
   onSetSampleStepPitch: (trackId: string, stepIndex: number, pitch: number) => void;
   onSetSampleTrackSample: (trackId: string, sampleId: string | null) => void;
+  onSetSampleTrackPlaybackMode: (trackId: string, mode: SamplePlaybackMode) => void;
   onLoadSample: (file: File) => Promise<SampleInstrument | null>;
   onAddSampleTrack: () => void;
   onRemoveSampleTrack: (trackId: string) => void;
@@ -359,6 +369,7 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
   onSetSampleStepVelocity,
   onSetSampleStepPitch,
   onSetSampleTrackSample,
+  onSetSampleTrackPlaybackMode,
   onLoadSample,
   onAddSampleTrack,
   onRemoveSampleTrack,
@@ -413,6 +424,7 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
           onSetStepVelocity={onSetSampleStepVelocity}
           onSetStepPitch={onSetSampleStepPitch}
           onSetSample={onSetSampleTrackSample}
+          onSetPlaybackMode={onSetSampleTrackPlaybackMode}
           onLoadSample={onLoadSample}
           onRemoveTrack={onRemoveSampleTrack}
         />
