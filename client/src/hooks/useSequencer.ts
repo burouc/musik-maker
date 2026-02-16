@@ -7,6 +7,8 @@ import type {
   ArrangementBlock,
   PlaybackMode,
   SequencerState,
+  PianoNote,
+  PianoRollData,
 } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
@@ -40,6 +42,7 @@ function createPattern(index: number): Pattern {
     name: `Pattern ${index + 1}`,
     color: PATTERN_COLORS[index % PATTERN_COLORS.length],
     tracks: createDefaultTracks(),
+    pianoRoll: { notes: [] },
   };
 }
 
@@ -116,6 +119,19 @@ function useSequencer() {
               }
             }
 
+            // Play piano roll notes at this step
+            for (const note of pattern.pianoRoll.notes) {
+              if (note.step === nextStep) {
+                const durationSec =
+                  (note.duration * (60 / current.bpm)) / 4;
+                audioEngine.current.playPianoNote(
+                  note.pitch,
+                  note.velocity,
+                  durationSec,
+                );
+              }
+            }
+
             return { ...prev, currentStep: nextStep };
           } else {
             // --- Song mode: play through the arrangement ---
@@ -155,6 +171,19 @@ function useSequencer() {
                       track.muted || (anySoloed && !track.solo);
                     if (!effectivelyMuted) {
                       audioEngine.current.playSound(track.id, track.volume);
+                    }
+                  }
+
+                  // Play piano roll notes in song mode
+                  for (const note of pattern.pianoRoll.notes) {
+                    if (note.step === nextStep) {
+                      const durationSec =
+                        (note.duration * (60 / current.bpm)) / 4;
+                      audioEngine.current.playPianoNote(
+                        note.pitch,
+                        note.velocity,
+                        durationSec,
+                      );
                     }
                   }
                 }
@@ -244,6 +273,7 @@ function useSequencer() {
         name: `${source.name} (copy)`,
         color: PATTERN_COLORS[prev.patterns.length % PATTERN_COLORS.length],
         tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps] })),
+        pianoRoll: { notes: source.pianoRoll.notes.map((n) => ({ ...n })) },
       };
       return {
         ...prev,
@@ -407,6 +437,58 @@ function useSequencer() {
   }, []);
 
   // -----------------------------------------------------------------------
+  // Piano roll actions
+  // -----------------------------------------------------------------------
+
+  const togglePianoNote = useCallback((pitch: number, step: number) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        const existing = pattern.pianoRoll.notes.find(
+          (n) => n.pitch === pitch && n.step === step,
+        );
+        if (existing) {
+          return {
+            ...pattern,
+            pianoRoll: {
+              notes: pattern.pianoRoll.notes.filter((n) => n.id !== existing.id),
+            },
+          };
+        }
+        const newNote: PianoNote = {
+          id: `note-${Date.now()}-${pitch}-${step}`,
+          pitch,
+          step,
+          duration: 1,
+          velocity: 0.8,
+        };
+        return {
+          ...pattern,
+          pianoRoll: {
+            notes: [...pattern.pianoRoll.notes, newNote],
+          },
+        };
+      }),
+    }));
+  }, []);
+
+  const previewPianoNote = useCallback((pitch: number) => {
+    audioEngine.current.playPianoNote(pitch, 0.5, 0.3);
+  }, []);
+
+  const clearPianoRoll = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? { ...pattern, pianoRoll: { notes: [] } }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  // -----------------------------------------------------------------------
   // Arrangement actions
   // -----------------------------------------------------------------------
 
@@ -524,6 +606,9 @@ function useSequencer() {
     deletePattern,
     renamePattern,
     duplicatePattern,
+    togglePianoNote,
+    previewPianoNote,
+    clearPianoRoll,
     toggleArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,

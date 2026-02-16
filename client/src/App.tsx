@@ -3,6 +3,7 @@ import StepSequencer from './components/StepSequencer';
 import TransportControls from './components/TransportControls';
 import Mixer from './components/Mixer';
 import PatternSelector from './components/PatternSelector';
+import PianoRoll from './components/PianoRoll';
 import Arrangement from './components/Arrangement';
 import './App.css';
 
@@ -23,19 +24,23 @@ function App() {
     deletePattern,
     renamePattern,
     duplicatePattern,
+    togglePianoNote,
+    previewPianoNote,
+    clearPianoRoll,
     toggleArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,
     setArrangementLength,
     setPlaybackMode,
+    activePattern,
   } = useSequencer();
 
   return (
     <div className="app">
       <header className="app-header">
         <h1>Musik Maker</h1>
-        <span className="app-subtitle">Step Sequencer &amp; Arrangement</span>
+        <span className="app-subtitle">Step Sequencer, Piano Roll &amp; Arrangement</span>
       </header>
 
       <TransportControls
@@ -71,6 +76,16 @@ function App() {
         onToggleSolo={toggleSolo}
         onClearTrack={clearTrack}
       />
+
+      {activePattern && (
+        <PianoRoll
+          pianoRoll={activePattern.pianoRoll}
+          currentStep={state.currentStep}
+          isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
+          onToggleNote={togglePianoNote}
+          onPreviewNote={previewPianoNote}
+        />
+      )}
 
       <Arrangement
         patterns={state.patterns}
