@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import type { Pattern, ArrangementTrack, PlaybackMode } from '../types';
 
 interface ArrangementProps {
@@ -10,6 +10,7 @@ interface ArrangementProps {
   currentMeasure: number;
   isPlaying: boolean;
   onToggleBlock: (arrTrackId: string, measure: number, patternId: string) => void;
+  onPlaceBlock: (arrTrackId: string, measure: number, patternId: string) => void;
   onToggleTrackMute: (arrTrackId: string) => void;
   onAddTrack: () => void;
   onRemoveTrack: (arrTrackId: string) => void;
@@ -26,12 +27,36 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
   currentMeasure,
   isPlaying,
   onToggleBlock,
+  onPlaceBlock,
   onToggleTrackMute,
   onAddTrack,
   onRemoveTrack,
   onSetLength,
   onSetPlaybackMode,
 }) {
+  const [dropTarget, setDropTarget] = useState<{ trackId: string; measure: number } | null>(null);
+
+  const handleDragOver = useCallback((e: React.DragEvent, trackId: string, measure: number) => {
+    if (e.dataTransfer.types.includes('application/x-pattern-id')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      setDropTarget({ trackId, measure });
+    }
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDropTarget(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, trackId: string, measure: number) => {
+    e.preventDefault();
+    const patternId = e.dataTransfer.getData('application/x-pattern-id');
+    if (patternId) {
+      onPlaceBlock(trackId, measure, patternId);
+    }
+    setDropTarget(null);
+  }, [onPlaceBlock]);
+
   const measures = Array.from({ length: arrangementLength }, (_, i) => i);
 
   return (
@@ -118,12 +143,14 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
                   ? patterns.find((p) => p.id === block.patternId)
                   : null;
 
+                const isDropTarget = dropTarget?.trackId === arrTrack.id && dropTarget?.measure === m;
+
                 return (
                   <button
                     key={m}
                     className={`arrangement-cell${block ? ' filled' : ''}${
                       m % 4 === 0 ? ' bar-start' : ''
-                    }${isPlaying && playbackMode === 'song' && m === currentMeasure ? ' current' : ''}`}
+                    }${isPlaying && playbackMode === 'song' && m === currentMeasure ? ' current' : ''}${isDropTarget ? ' drop-target' : ''}`}
                     style={
                       pattern
                         ? ({
@@ -134,6 +161,9 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
                     onClick={() =>
                       onToggleBlock(arrTrack.id, m, activePatternId)
                     }
+                    onDragOver={(e) => handleDragOver(e, arrTrack.id, m)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, arrTrack.id, m)}
                     title={pattern ? pattern.name : `Place ${patterns.find(p => p.id === activePatternId)?.name ?? 'pattern'} here`}
                   >
                     {pattern && (

@@ -35,6 +35,7 @@ function App() {
     movePianoNotes,
     pastePianoNotes,
     toggleArrangementBlock,
+    placeArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,
@@ -177,6 +178,7 @@ function App() {
         currentMeasure={state.currentMeasure}
         isPlaying={state.isPlaying}
         onToggleBlock={toggleArrangementBlock}
+        onPlaceBlock={placeArrangementBlock}
         onToggleTrackMute={toggleArrangementTrackMute}
         onAddTrack={addArrangementTrack}
         onRemoveTrack={removeArrangementTrack}

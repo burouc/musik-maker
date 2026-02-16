@@ -51,6 +51,11 @@ const PatternSelector = React.memo<PatternSelectorProps>(
                   '--pattern-color': pattern.color,
                 } as React.CSSProperties
               }
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/x-pattern-id', pattern.id);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
               onClick={() => onSelectPattern(pattern.id)}
             >
               <span

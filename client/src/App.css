@@ -1201,6 +1201,20 @@
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
 }
 
+.arrangement-cell.drop-target {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.2);
+  box-shadow: 0 0 8px rgba(233, 69, 96, 0.3);
+}
+
+.pattern-chip[draggable='true'] {
+  cursor: grab;
+}
+
+.pattern-chip[draggable='true']:active {
+  cursor: grabbing;
+}
+
 .arrangement-block-label {
   font-size: 0.55rem;
   font-weight: 700;

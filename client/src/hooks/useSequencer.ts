@@ -828,6 +828,39 @@ function useSequencer() {
     [],
   );
 
+  const placeArrangementBlock = useCallback(
+    (arrTrackId: string, measure: number, patternId: string) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+
+          const existingIndex = arrTrack.blocks.findIndex(
+            (b) => b.startMeasure === measure,
+          );
+
+          if (existingIndex !== -1) {
+            // Replace existing block
+            return {
+              ...arrTrack,
+              blocks: arrTrack.blocks.map((b, i) =>
+                i === existingIndex ? { ...b, patternId } : b,
+              ),
+            };
+          }
+
+          // Add new block
+          const newBlock: ArrangementBlock = { patternId, startMeasure: measure };
+          return {
+            ...arrTrack,
+            blocks: [...arrTrack.blocks, newBlock],
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
   const toggleArrangementTrackMute = useCallback((arrTrackId: string) => {
     setState((prev) => ({
       ...prev,
@@ -1377,6 +1410,7 @@ function useSequencer() {
     pastePianoNotes,
     clearPianoRoll,
     toggleArrangementBlock,
+    placeArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,
