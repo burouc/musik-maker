@@ -954,6 +954,11 @@
   box-shadow: 0 0 6px rgba(233, 69, 96, 0.4);
 }
 
+.piano-roll-cell.selected {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
 .piano-roll-cell.current {
   border-color: rgba(255, 255, 255, 0.4);
 }

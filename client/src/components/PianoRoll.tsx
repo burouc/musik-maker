@@ -72,6 +72,7 @@ function PianoRoll({
   const dragRef = useRef<DragState | null>(null);
   const [resize, setResize] = useState<ResizeState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
   // Build a lookup: for each pitch, a sorted list of notes
   const notesByPitch = useRef<Map<number, PianoNote[]>>(new Map());
@@ -135,6 +136,7 @@ function PianoRoll({
       // Check for resize edge first
       const edgeHit = detectEdge(e, pitch, step);
       if (edgeHit) {
+        setSelectedNoteId(edgeHit.note.id);
         const newResize: ResizeState = {
           noteId: edgeHit.note.id,
           pitch: edgeHit.note.pitch,
@@ -151,17 +153,34 @@ function PianoRoll({
       // Check if there's an existing note covering this cell
       const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
       if (coveredNote) {
-        // Delete the note
-        onDeleteNote(coveredNote.id);
+        // Select the note (right-click or Delete key to delete)
+        setSelectedNoteId(coveredNote.id);
         return;
       }
+      // Clicking empty space clears selection
+      setSelectedNoteId(null);
       // Start drawing a new note
       onPreviewNote(pitch);
       const newDrag: DragState = { pitch, startStep: step, currentStep: step };
       dragRef.current = newDrag;
       setDrag(newDrag);
     },
-    [onDeleteNote, onPreviewNote],
+    [onPreviewNote],
+  );
+
+  /** Right-click on a note to delete it */
+  const handleCellContextMenu = useCallback(
+    (pitch: number, step: number, e: React.MouseEvent) => {
+      e.preventDefault();
+      const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
+      if (coveredNote) {
+        if (selectedNoteId === coveredNote.id) {
+          setSelectedNoteId(null);
+        }
+        onDeleteNote(coveredNote.id);
+      }
+    },
+    [onDeleteNote, selectedNoteId],
   );
 
   const handleCellMouseEnter = useCallback(
@@ -230,6 +249,27 @@ function PianoRoll({
     window.addEventListener('mouseup', onUp);
     return () => window.removeEventListener('mouseup', onUp);
   }, [handleMouseUp]);
+
+  // Delete/Backspace key handler for selected notes
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!selectedNoteId) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        onDeleteNote(selectedNoteId);
+        setSelectedNoteId(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedNoteId, onDeleteNote]);
+
+  // Clear selection if the selected note no longer exists
+  useEffect(() => {
+    if (selectedNoteId && !pianoRoll.notes.some((n) => n.id === selectedNoteId)) {
+      setSelectedNoteId(null);
+    }
+  }, [pianoRoll.notes, selectedNoteId]);
 
   // Compute drag preview range
   const dragMin = drag ? Math.min(drag.startStep, drag.currentStep) : -1;
@@ -319,6 +359,7 @@ function PianoRoll({
                     // Determine if this cell is a resize handle (left or right edge of a note)
                     const isLeftEdge = isNoteStart && isCovered;
                     const isRightEdge = isCovered && coveredNote && step === coveredNote.step + coveredNote.duration - 1;
+                    const isSelected = isCovered && coveredNote && coveredNote.id === selectedNoteId;
 
                     return (
                       <div
@@ -327,6 +368,7 @@ function PianoRoll({
                           `piano-roll-cell` +
                           (isNoteStart && !hideForResize ? ' active note-start' : '') +
                           (isContinuation && !hideForResize ? ' active note-continuation' : '') +
+                          (isSelected && !hideForResize ? ' selected' : '') +
                           (isCurrent ? ' current' : '') +
                           (step % 4 === 0 ? ' beat-start' : '') +
                           (isDragPreview && !isCovered ? ' drag-preview' : '') +
@@ -340,6 +382,7 @@ function PianoRoll({
                         onMouseDown={(e) => handleCellMouseDown(midi, step, e)}
                         onMouseEnter={() => handleCellMouseEnter(midi, step)}
                         onMouseUp={handleMouseUp}
+                        onContextMenu={(e) => handleCellContextMenu(midi, step, e)}
                       >
                         {isNoteStart && noteStart!.duration > 1 && !hideForResize && (
                           <div
