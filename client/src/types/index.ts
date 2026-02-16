@@ -293,4 +293,6 @@ export interface SequencerState {
   loopEnd: number | null;
   /** Automation lanes for parameter control over time */
   automationLanes: AutomationLane[];
+  /** Whether the metronome click is enabled during playback */
+  metronomeEnabled: boolean;
 }

@@ -17,6 +17,7 @@ function App() {
     setStepVelocity,
     setStepPitch,
     togglePlay,
+    toggleMetronome,
     setBpm,
     setTrackVolume,
     setTrackPan,
@@ -100,8 +101,10 @@ function App() {
         currentStep={state.currentStep}
         currentMeasure={state.currentMeasure}
         stepCount={activePattern?.stepCount ?? 16}
+        metronomeEnabled={state.metronomeEnabled}
         onTogglePlay={togglePlay}
         onBpmChange={setBpm}
+        onToggleMetronome={toggleMetronome}
         onClearAll={clearAll}
       />
 

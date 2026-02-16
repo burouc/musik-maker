@@ -702,6 +702,36 @@ class AudioEngine {
   }
 
   // ---------------------------------------------------------------------------
+  // Metronome
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Play a metronome click sound.
+   * @param accent  True for the downbeat (beat 1), which plays a higher pitch.
+   * @param volume  0–1
+   */
+  async playMetronome(accent: boolean, volume: number = 0.5): Promise<void> {
+    await this.resume();
+    const now = this.context.currentTime;
+    const freq = accent ? 1500 : 1000;
+    const duration = 0.03;
+
+    const osc = this.context.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + duration);
+  }
+
+  // ---------------------------------------------------------------------------
   // Private synthesis methods
   // ---------------------------------------------------------------------------
 

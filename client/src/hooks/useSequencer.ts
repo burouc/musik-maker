@@ -116,6 +116,7 @@ const INITIAL_STATE: SequencerState = {
   loopStart: null,
   loopEnd: null,
   automationLanes: [],
+  metronomeEnabled: false,
 };
 
 function useSequencer() {
@@ -318,6 +319,11 @@ function useSequencer() {
               }
             }
 
+            // Metronome click on each beat (every 4 steps)
+            if (current.metronomeEnabled && nextStep % 4 === 0) {
+              audioEngine.current.playMetronome(nextStep === 0);
+            }
+
             return { ...prev, currentStep: nextStep };
           } else {
             // --- Song mode: play through the arrangement ---
@@ -411,6 +417,11 @@ function useSequencer() {
                   }
                 }
               }
+            }
+
+            // Metronome click on each beat (every 4 steps)
+            if (current.metronomeEnabled && nextStep % 4 === 0) {
+              audioEngine.current.playMetronome(nextStep === 0);
             }
 
             // Apply automation lanes
@@ -624,6 +635,10 @@ function useSequencer() {
         currentMeasure: nextPlaying ? songStart : -1,
       };
     });
+  }, []);
+
+  const toggleMetronome = useCallback(() => {
+    setState((prev) => ({ ...prev, metronomeEnabled: !prev.metronomeEnabled }));
   }, []);
 
   const setBpm = useCallback((bpm: number) => {
@@ -1774,6 +1789,7 @@ function useSequencer() {
     setStepVelocity,
     setStepPitch,
     togglePlay,
+    toggleMetronome,
     setBpm,
     setTrackVolume,
     setTrackPan,

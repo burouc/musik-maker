@@ -8,8 +8,10 @@ interface TransportControlsProps {
   currentStep: number;
   currentMeasure: number;
   stepCount: number;
+  metronomeEnabled: boolean;
   onTogglePlay: () => void;
   onBpmChange: (bpm: number) => void;
+  onToggleMetronome: () => void;
   onClearAll: () => void;
 }
 
@@ -83,8 +85,10 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
     currentStep,
     currentMeasure,
     stepCount: _stepCount,
+    metronomeEnabled,
     onTogglePlay,
     onBpmChange,
+    onToggleMetronome,
     onClearAll,
   }) => {
     const handleBpmChange = (
@@ -140,6 +144,14 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
             onChange={handleBpmChange}
           />
         </div>
+
+        <button
+          className={`transport-btn metronome-btn${metronomeEnabled ? " active" : ""}`}
+          onClick={onToggleMetronome}
+          title="Toggle metronome"
+        >
+          Metro
+        </button>
 
         <button className="transport-btn clear-btn" onClick={onClearAll}>
           Clear All

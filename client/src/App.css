@@ -74,6 +74,28 @@
   background: #555;
 }
 
+.metronome-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.metronome-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.metronome-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.metronome-btn.active:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
 .transport-controls .clear-btn {
   background: transparent;
   color: var(--text-secondary);
