@@ -12,6 +12,7 @@ function App() {
     state,
     tracks,
     toggleStep,
+    setStepVelocity,
     togglePlay,
     setBpm,
     setTrackVolume,
@@ -68,6 +69,7 @@ function App() {
         currentStep={state.currentStep}
         isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
         onToggleStep={toggleStep}
+        onSetStepVelocity={setStepVelocity}
         onStepCountChange={setPatternStepCount}
       />
 

@@ -24,14 +24,16 @@ const PATTERN_COLORS = [
   '#f97316',
 ];
 
+const DEFAULT_VELOCITY = 0.8;
+
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
   ];
 }
 
@@ -111,11 +113,12 @@ function useSequencer() {
             const anySoloed = pattern.tracks.some((t) => t.solo);
 
             for (const track of pattern.tracks) {
-              if (!track.steps[nextStep]) continue;
+              const stepVelocity = track.steps[nextStep];
+              if (stepVelocity <= 0) continue;
               const effectivelyMuted =
                 track.muted || (anySoloed && !track.solo);
               if (!effectivelyMuted) {
-                audioEngine.current.playSound(track.id, track.volume);
+                audioEngine.current.playSound(track.id, track.volume * stepVelocity);
               }
             }
 
@@ -174,11 +177,12 @@ function useSequencer() {
                   const anySoloed = pattern.tracks.some((t) => t.solo);
 
                   for (const track of pattern.tracks) {
-                    if (!track.steps[nextStep]) continue;
+                    const stepVelocity = track.steps[nextStep];
+                    if (stepVelocity <= 0) continue;
                     const effectivelyMuted =
                       track.muted || (anySoloed && !track.solo);
                     if (!effectivelyMuted) {
-                      audioEngine.current.playSound(track.id, track.volume);
+                      audioEngine.current.playSound(track.id, track.volume * stepVelocity);
                     }
                   }
 
@@ -309,7 +313,34 @@ function useSequencer() {
                     ? {
                         ...track,
                         steps: track.steps.map((v, i) =>
-                          i === stepIndex ? !v : v,
+                          i === stepIndex ? (v > 0 ? 0 : DEFAULT_VELOCITY) : v,
+                        ),
+                      }
+                    : track,
+                ),
+              }
+            : pattern,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const setStepVelocity = useCallback(
+    (trackId: InstrumentName, stepIndex: number, velocity: number) => {
+      const clamped = Math.max(0, Math.min(1, velocity));
+      setState((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
+            ? {
+                ...pattern,
+                tracks: pattern.tracks.map((track) =>
+                  track.id === trackId
+                    ? {
+                        ...track,
+                        steps: track.steps.map((v, i) =>
+                          i === stepIndex ? clamped : v,
                         ),
                       }
                     : track,
@@ -416,7 +447,7 @@ function useSequencer() {
               ...pattern,
               tracks: pattern.tracks.map((track) =>
                 track.id === trackId
-                  ? { ...track, steps: Array(pattern.stepCount).fill(false) }
+                  ? { ...track, steps: Array(pattern.stepCount).fill(0) }
                   : track,
               ),
             }
@@ -437,7 +468,7 @@ function useSequencer() {
               ...pattern,
               tracks: pattern.tracks.map((track) => ({
                 ...track,
-                steps: Array(pattern.stepCount).fill(false),
+                steps: Array(pattern.stepCount).fill(0),
               })),
             }
           : pattern,
@@ -458,10 +489,10 @@ function useSequencer() {
           stepCount: clamped,
           tracks: pattern.tracks.map((track) => {
             if (clamped > oldCount) {
-              // Extend: pad with false
+              // Extend: pad with 0 (off)
               return {
                 ...track,
-                steps: [...track.steps, ...Array(clamped - oldCount).fill(false)],
+                steps: [...track.steps, ...Array(clamped - oldCount).fill(0)],
               };
             }
             // Shrink: truncate
@@ -634,6 +665,7 @@ function useSequencer() {
     tracks,
     activePattern,
     toggleStep,
+    setStepVelocity,
     togglePlay,
     setBpm,
     setTrackVolume,

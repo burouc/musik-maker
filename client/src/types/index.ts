@@ -9,7 +9,8 @@ export type InstrumentName =
 export interface Track {
   id: InstrumentName;
   name: string;
-  steps: boolean[];
+  /** Per-step velocity: 0 = off, 0.01–1.0 = on with that velocity */
+  steps: number[];
   volume: number;
   muted: boolean;
   solo: boolean;
