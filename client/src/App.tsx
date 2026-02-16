@@ -30,6 +30,7 @@ function App() {
     setStepPitch,
     togglePlay,
     toggleMetronome,
+    setSwing,
     setBpm,
     setTrackVolume,
     setTrackPan,
@@ -288,6 +289,7 @@ function App() {
       <TransportControls
         isPlaying={state.isPlaying}
         bpm={state.bpm}
+        swing={state.swing}
         playbackMode={state.playbackMode}
         currentStep={state.currentStep}
         currentMeasure={state.currentMeasure}
@@ -295,6 +297,7 @@ function App() {
         metronomeEnabled={state.metronomeEnabled}
         onTogglePlay={togglePlay}
         onBpmChange={setBpm}
+        onSwingChange={setSwing}
         onToggleMetronome={toggleMetronome}
         onClearAll={clearAll}
       />

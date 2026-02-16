@@ -282,6 +282,8 @@ export interface ProjectData {
   loopStart: number | null;
   loopEnd: number | null;
   metronomeEnabled: boolean;
+  /** Swing amount: 0 = straight, 0.5 = light shuffle, 1 = full triplet swing */
+  swing: number;
 }
 
 export type PlaybackMode = 'pattern' | 'song';
@@ -323,4 +325,6 @@ export interface SequencerState {
   automationLanes: AutomationLane[];
   /** Whether the metronome click is enabled during playback */
   metronomeEnabled: boolean;
+  /** Swing amount: 0 = straight, 0.5 = light shuffle, 1 = full triplet swing */
+  swing: number;
 }

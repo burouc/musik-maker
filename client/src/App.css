@@ -417,6 +417,27 @@
   outline: none;
 }
 
+.swing-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.swing-control label {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  min-width: 90px;
+  color: var(--text-secondary);
+}
+
+.swing-control input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 6px;
+}
+
 /* =========================================================================
    Pattern Selector
    ========================================================================= */

@@ -4,6 +4,7 @@ import type { PlaybackMode } from "../types";
 interface TransportControlsProps {
   isPlaying: boolean;
   bpm: number;
+  swing: number;
   playbackMode: PlaybackMode;
   currentStep: number;
   currentMeasure: number;
@@ -11,6 +12,7 @@ interface TransportControlsProps {
   metronomeEnabled: boolean;
   onTogglePlay: () => void;
   onBpmChange: (bpm: number) => void;
+  onSwingChange: (swing: number) => void;
   onToggleMetronome: () => void;
   onClearAll: () => void;
 }
@@ -81,6 +83,7 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
   ({
     isPlaying,
     bpm,
+    swing,
     playbackMode,
     currentStep,
     currentMeasure,
@@ -88,6 +91,7 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
     metronomeEnabled,
     onTogglePlay,
     onBpmChange,
+    onSwingChange,
     onToggleMetronome,
     onClearAll,
   }) => {
@@ -96,6 +100,12 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
     ) => {
       const value = Number(e.target.value);
       onBpmChange(value);
+    };
+
+    const handleSwingChange = (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+      onSwingChange(Number(e.target.value) / 100);
     };
 
     const barsBeatsTicks = useMemo(
@@ -142,6 +152,18 @@ const TransportControls: React.FC<TransportControlsProps> = React.memo(
             max={300}
             value={bpm}
             onChange={handleBpmChange}
+          />
+        </div>
+
+        <div className="swing-control">
+          <label>Swing: {Math.round(swing * 100)}%</label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(swing * 100)}
+            onChange={handleSwingChange}
           />
         </div>
 

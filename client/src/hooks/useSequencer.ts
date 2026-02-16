@@ -120,6 +120,7 @@ const INITIAL_STATE: SequencerState = {
   loopEnd: null,
   automationLanes: [],
   metronomeEnabled: false,
+  swing: 0,
 };
 
 const MAX_UNDO_HISTORY = 50;
@@ -302,10 +303,33 @@ function useSequencer() {
   // -----------------------------------------------------------------------
   useEffect(() => {
     if (state.isPlaying) {
-      const intervalMs = (60 / state.bpm / 4) * 1000;
+      const sixteenthMs = (60 / state.bpm / 4) * 1000;
 
-      timerRef.current = window.setInterval(() => {
-        setState((prev) => {
+      /**
+       * Calculate the delay before the NEXT step fires, accounting for swing.
+       * Swing shifts odd-numbered 16th notes later within each 8th-note pair.
+       * At swing=0 both 16ths are equal (50/50 split of the 8th note).
+       * At swing=1 the split is 2:1 (triplet feel, 66.7/33.3).
+       */
+      const getStepDelay = (currentStep: number): number => {
+        const cur = stateRef.current;
+        const swing = cur.swing;
+        if (swing === 0) return sixteenthMs;
+        // Ratio shifts from 0.5 (even) toward 2/3 (triplet) based on swing
+        const ratio = 0.5 + swing * (1 / 6); // 0.5 → 0.667
+        const eighthMs = sixteenthMs * 2;
+        // currentStep is the step we just played; determine if NEXT step is odd or even
+        const isCurrentEven = currentStep % 2 === 0;
+        // After an even step, the next (odd) step comes after the long portion
+        // After an odd step, the next (even) step comes after the short portion
+        return isCurrentEven ? eighthMs * ratio : eighthMs * (1 - ratio);
+      };
+
+      const scheduleNext = (prevStep: number) => {
+        const delay = getStepDelay(prevStep);
+        timerRef.current = window.setTimeout(() => {
+          let playedStep = -1;
+          setState((prev) => {
           const current = stateRef.current;
 
           if (current.playbackMode === 'pattern') {
@@ -364,6 +388,7 @@ function useSequencer() {
               audioEngine.current.playMetronome(nextStep === 0);
             }
 
+            playedStep = nextStep;
             return { ...prev, currentStep: nextStep };
           } else {
             // --- Song mode: play through the arrangement ---
@@ -473,6 +498,7 @@ function useSequencer() {
               }
             }
 
+            playedStep = nextStep;
             return {
               ...prev,
               currentStep: nextStep,
@@ -480,21 +506,29 @@ function useSequencer() {
             };
           }
         });
-      }, intervalMs);
+          // Schedule the next tick (playedStep is captured by the setState callback above)
+          if (stateRef.current.isPlaying) {
+            scheduleNext(playedStep >= 0 ? playedStep : 0);
+          }
+        }, delay);
+      };
+
+      // Kick off the first step
+      scheduleNext(stateRef.current.currentStep >= 0 ? stateRef.current.currentStep : -1);
     } else {
       if (timerRef.current !== null) {
-        clearInterval(timerRef.current);
+        clearTimeout(timerRef.current);
         timerRef.current = null;
       }
     }
 
     return () => {
       if (timerRef.current !== null) {
-        clearInterval(timerRef.current);
+        clearTimeout(timerRef.current);
         timerRef.current = null;
       }
     };
-  }, [state.isPlaying, state.bpm]);
+  }, [state.isPlaying, state.bpm, state.swing]);
 
   // -----------------------------------------------------------------------
   // Pattern actions
@@ -685,6 +719,11 @@ function useSequencer() {
 
   const toggleMetronome = useCallback(() => {
     setState((prev) => ({ ...prev, metronomeEnabled: !prev.metronomeEnabled }));
+  }, []);
+
+  const setSwing = useCallback((swing: number) => {
+    const clamped = Math.max(0, Math.min(1, swing));
+    setState((prev) => ({ ...prev, swing: clamped }));
   }, []);
 
   const setBpm = useCallback((bpm: number) => {
@@ -1883,6 +1922,7 @@ function useSequencer() {
       loopStart: s.loopStart,
       loopEnd: s.loopEnd,
       metronomeEnabled: s.metronomeEnabled,
+      swing: s.swing,
     };
     const res = await fetch(`${API_BASE}/api/projects/${id}`, {
       method: 'PUT',
@@ -1914,6 +1954,7 @@ function useSequencer() {
       loopStart: project.loopStart,
       loopEnd: project.loopEnd,
       metronomeEnabled: project.metronomeEnabled,
+      swing: project.swing ?? 0,
       // Reset playback state
       isPlaying: false,
       currentStep: -1,
@@ -1959,6 +2000,7 @@ function useSequencer() {
     setStepPitch,
     togglePlay,
     toggleMetronome,
+    setSwing,
     setBpm,
     setTrackVolume,
     setTrackPan,
