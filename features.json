@@ -514,7 +514,7 @@
           "id": "au-02",
           "priority": "P0",
           "title": "Draw automation curves (point-and-click or freehand)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "au-03",

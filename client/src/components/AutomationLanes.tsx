@@ -1,6 +1,9 @@
 import React, { useState, useCallback, useRef } from 'react';
 import type { AutomationLane, AutomationTarget } from '../types';
 
+/** Drawing tool mode for automation lanes */
+type DrawMode = 'point' | 'freehand' | 'line' | 'erase';
+
 interface AutomationLanesProps {
   lanes: AutomationLane[];
   arrangementLength: number;
@@ -33,6 +36,20 @@ const BAR_GROUP_MARGIN = 4;
 const LANE_HEIGHT = 80;
 const STEPS_PER_MEASURE = 16;
 
+const DRAW_MODE_LABELS: Record<DrawMode, string> = {
+  point: 'Pt',
+  freehand: 'Draw',
+  line: 'Line',
+  erase: 'Erase',
+};
+
+const DRAW_MODE_TITLES: Record<DrawMode, string> = {
+  point: 'Point mode: click to add/move points',
+  freehand: 'Freehand mode: click and drag to draw curves',
+  line: 'Line mode: click start point, then click end point to draw a line',
+  erase: 'Erase mode: click or drag to remove points',
+};
+
 const AutomationLanes = React.memo<AutomationLanesProps>(function AutomationLanes({
   lanes,
   arrangementLength,
@@ -49,6 +66,7 @@ const AutomationLanes = React.memo<AutomationLanesProps>(function AutomationLane
 }) {
   const [selectedTarget, setSelectedTarget] = useState<AutomationTarget>('masterVolume');
   const [collapsed, setCollapsed] = useState(false);
+  const [drawMode, setDrawMode] = useState<DrawMode>('point');
 
   const usedTargets = new Set(lanes.map((l) => l.target));
   const availableTargets = AVAILABLE_TARGETS.filter((t) => !usedTargets.has(t.value));
@@ -70,20 +88,36 @@ const AutomationLanes = React.memo<AutomationLanesProps>(function AutomationLane
         <div className="automation-title" onClick={() => setCollapsed(!collapsed)}>
           Automation {collapsed ? '+' : '-'}
         </div>
-        {!collapsed && availableTargets.length > 0 && (
-          <div className="automation-add-controls">
-            <select
-              className="automation-target-select"
-              value={selectedTarget}
-              onChange={(e) => setSelectedTarget(e.target.value as AutomationTarget)}
-            >
-              {availableTargets.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+        {!collapsed && (
+          <div className="automation-header-controls">
+            <div className="automation-draw-mode-group">
+              {(Object.keys(DRAW_MODE_LABELS) as DrawMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  className={`automation-draw-mode-btn${drawMode === mode ? ' active' : ''}`}
+                  onClick={() => setDrawMode(mode)}
+                  title={DRAW_MODE_TITLES[mode]}
+                >
+                  {DRAW_MODE_LABELS[mode]}
+                </button>
               ))}
-            </select>
-            <button className="automation-add-btn" onClick={handleAddLane}>
-              + Lane
-            </button>
+            </div>
+            {availableTargets.length > 0 && (
+              <div className="automation-add-controls">
+                <select
+                  className="automation-target-select"
+                  value={selectedTarget}
+                  onChange={(e) => setSelectedTarget(e.target.value as AutomationTarget)}
+                >
+                  {availableTargets.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                <button className="automation-add-btn" onClick={handleAddLane}>
+                  + Lane
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -98,6 +132,7 @@ const AutomationLanes = React.memo<AutomationLanesProps>(function AutomationLane
           currentStep={currentStep}
           isPlaying={isPlaying}
           playbackMode={playbackMode}
+          drawMode={drawMode}
           onToggle={() => onToggleLane(lane.id)}
           onRemove={() => onRemoveLane(lane.id)}
           onClear={() => onClearLane(lane.id)}
@@ -117,6 +152,7 @@ interface AutomationLaneRowProps {
   currentStep: number;
   isPlaying: boolean;
   playbackMode: string;
+  drawMode: DrawMode;
   onToggle: () => void;
   onRemove: () => void;
   onClear: () => void;
@@ -132,6 +168,7 @@ const AutomationLaneRow = React.memo<AutomationLaneRowProps>(function Automation
   currentStep,
   isPlaying,
   playbackMode,
+  drawMode,
   onToggle,
   onRemove,
   onClear,
@@ -141,6 +178,11 @@ const AutomationLaneRow = React.memo<AutomationLaneRowProps>(function Automation
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [drawing, setDrawing] = useState(false);
+  const lastDrawPos = useRef<{ x: number; y: number } | null>(null);
+  // Line mode: the anchor point for the pending line
+  const lineAnchor = useRef<{ measure: number; step: number; value: number } | null>(null);
+  const [linePreview, setLinePreview] = useState<{ x: number; y: number } | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
 
   // Calculate total canvas width to match arrangement grid
   const totalWidth = measures.reduce((acc, m) => {
@@ -184,6 +226,60 @@ const AutomationLaneRow = React.memo<AutomationLaneRowProps>(function Automation
     return accX;
   }, [arrangementLength]);
 
+  // Convert (measure, step) to a linear index for interpolation
+  const toLinear = (measure: number, step: number): number =>
+    measure * STEPS_PER_MEASURE + step;
+
+  // Convert linear index back to (measure, step)
+  const fromLinear = (idx: number): { measure: number; step: number } => ({
+    measure: Math.floor(idx / STEPS_PER_MEASURE),
+    step: idx % STEPS_PER_MEASURE,
+  });
+
+  // Interpolate freehand points between two positions, filling every step
+  const interpolateAndSet = useCallback(
+    (x1: number, y1: number, x2: number, y2: number) => {
+      const ms1 = xToMeasureStep(x1);
+      const ms2 = xToMeasureStep(x2);
+      const v1 = 1 - y1 / LANE_HEIGHT;
+      const v2 = 1 - y2 / LANE_HEIGHT;
+      const lin1 = toLinear(ms1.measure, ms1.step);
+      const lin2 = toLinear(ms2.measure, ms2.step);
+
+      if (lin1 === lin2) {
+        onSetPoint(ms2.measure, ms2.step, v2);
+        return;
+      }
+
+      const start = Math.min(lin1, lin2);
+      const end = Math.max(lin1, lin2);
+      for (let i = start; i <= end; i++) {
+        const t = (i - lin1) / (lin2 - lin1);
+        const value = v1 + t * (v2 - v1);
+        const { measure, step } = fromLinear(i);
+        if (measure < arrangementLength) {
+          onSetPoint(measure, step, value);
+        }
+      }
+    },
+    [xToMeasureStep, onSetPoint, arrangementLength],
+  );
+
+  // Erase points near a pixel position
+  const eraseNear = useCallback(
+    (x: number, y: number) => {
+      for (const pt of lane.points) {
+        const px = measureStepToX(pt.measure, pt.step);
+        const py = (1 - pt.value) * LANE_HEIGHT;
+        const dist = Math.sqrt((px - x) ** 2 + (py - y) ** 2);
+        if (dist < 14) {
+          onRemovePoint(pt.measure, pt.step);
+        }
+      }
+    },
+    [lane.points, measureStepToX, onRemovePoint],
+  );
+
   // Draw the automation curve
   const drawCurve = useCallback(() => {
     const canvas = canvasRef.current;
@@ -226,6 +322,44 @@ const AutomationLaneRow = React.memo<AutomationLaneRowProps>(function Automation
       ctx.moveTo(px + 0.5, 0);
       ctx.lineTo(px + 0.5, LANE_HEIGHT);
       ctx.stroke();
+    }
+
+    // Draw hover crosshair
+    if (hoverPos && !drawing) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(hoverPos.x, 0);
+      ctx.lineTo(hoverPos.x, LANE_HEIGHT);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, hoverPos.y);
+      ctx.lineTo(totalWidth, hoverPos.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw value label
+      const hoverValue = Math.round((1 - hoverPos.y / LANE_HEIGHT) * 100);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '10px monospace';
+      const labelX = hoverPos.x + 6;
+      const labelY = hoverPos.y > 14 ? hoverPos.y - 4 : hoverPos.y + 14;
+      ctx.fillText(`${hoverValue}%`, labelX, labelY);
+    }
+
+    // Draw line-mode preview
+    if (drawMode === 'line' && lineAnchor.current && linePreview) {
+      const anchorX = measureStepToX(lineAnchor.current.measure, lineAnchor.current.step);
+      const anchorY = (1 - lineAnchor.current.value) * LANE_HEIGHT;
+      ctx.strokeStyle = 'rgba(78,205,196,0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 3]);
+      ctx.beginPath();
+      ctx.moveTo(anchorX, anchorY);
+      ctx.lineTo(linePreview.x, linePreview.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     if (lane.points.length === 0) return;
@@ -276,26 +410,42 @@ const AutomationLaneRow = React.memo<AutomationLaneRowProps>(function Automation
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [lane, totalWidth, arrangementLength, measureStepToX, currentMeasure, currentStep, isPlaying, playbackMode]);
+
+    // Draw line-mode anchor point highlight
+    if (drawMode === 'line' && lineAnchor.current) {
+      const ax = measureStepToX(lineAnchor.current.measure, lineAnchor.current.step);
+      const ay = (1 - lineAnchor.current.value) * LANE_HEIGHT;
+      ctx.beginPath();
+      ctx.arc(ax, ay, 6, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }, [lane, totalWidth, arrangementLength, measureStepToX, currentMeasure, currentStep, isPlaying, playbackMode, hoverPos, drawing, drawMode, linePreview]);
 
   // Redraw on changes
   React.useEffect(() => {
     drawCurve();
   }, [drawCurve]);
 
+  // Get canvas-local coordinates from mouse event
+  const getCanvasPos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: Math.max(0, Math.min(LANE_HEIGHT, e.clientY - rect.top)),
+    };
+  }, []);
+
   // Mouse handlers for drawing automation
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = getCanvasPos(e);
 
+    // Right-click always removes nearest point regardless of mode
     if (e.button === 2) {
-      // Right-click: remove nearest point
       e.preventDefault();
-      const { measure, step } = xToMeasureStep(x);
-      // Find closest point within a threshold
       let closest: { m: number; s: number; dist: number } | null = null;
       for (const pt of lane.points) {
         const px = measureStepToX(pt.measure, pt.step);
@@ -311,28 +461,94 @@ const AutomationLaneRow = React.memo<AutomationLaneRowProps>(function Automation
       return;
     }
 
-    // Left-click: add/update point
-    setDrawing(true);
-    const { measure, step } = xToMeasureStep(x);
-    const value = 1 - y / LANE_HEIGHT;
-    onSetPoint(measure, step, value);
-  }, [xToMeasureStep, measureStepToX, lane.points, onSetPoint, onRemovePoint]);
+    if (drawMode === 'point') {
+      setDrawing(true);
+      const { measure, step } = xToMeasureStep(x);
+      const value = 1 - y / LANE_HEIGHT;
+      onSetPoint(measure, step, value);
+    } else if (drawMode === 'freehand') {
+      setDrawing(true);
+      lastDrawPos.current = { x, y };
+      const { measure, step } = xToMeasureStep(x);
+      const value = 1 - y / LANE_HEIGHT;
+      onSetPoint(measure, step, value);
+    } else if (drawMode === 'line') {
+      const { measure, step } = xToMeasureStep(x);
+      const value = 1 - y / LANE_HEIGHT;
+
+      if (!lineAnchor.current) {
+        // First click: set anchor
+        lineAnchor.current = { measure, step, value };
+        onSetPoint(measure, step, value);
+      } else {
+        // Second click: draw line from anchor to here
+        const anchor = lineAnchor.current;
+        const anchorX = measureStepToX(anchor.measure, anchor.step);
+        const anchorY = (1 - anchor.value) * LANE_HEIGHT;
+        interpolateAndSet(anchorX, anchorY, x, y);
+        lineAnchor.current = null;
+        setLinePreview(null);
+      }
+    } else if (drawMode === 'erase') {
+      setDrawing(true);
+      eraseNear(x, y);
+    }
+  }, [drawMode, getCanvasPos, xToMeasureStep, measureStepToX, lane.points, onSetPoint, onRemovePoint, interpolateAndSet, eraseNear]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x, y } = getCanvasPos(e);
+
+    // Update hover position for crosshair
+    setHoverPos({ x, y });
+
+    // Line mode preview
+    if (drawMode === 'line' && lineAnchor.current) {
+      setLinePreview({ x, y });
+    }
+
     if (!drawing) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = Math.max(0, Math.min(LANE_HEIGHT, e.clientY - rect.top));
-    const { measure, step } = xToMeasureStep(x);
-    const value = 1 - y / LANE_HEIGHT;
-    onSetPoint(measure, step, value);
-  }, [drawing, xToMeasureStep, onSetPoint]);
+
+    if (drawMode === 'point') {
+      const { measure, step } = xToMeasureStep(x);
+      const value = 1 - y / LANE_HEIGHT;
+      onSetPoint(measure, step, value);
+    } else if (drawMode === 'freehand') {
+      const prev = lastDrawPos.current;
+      if (prev) {
+        interpolateAndSet(prev.x, prev.y, x, y);
+      } else {
+        const { measure, step } = xToMeasureStep(x);
+        const value = 1 - y / LANE_HEIGHT;
+        onSetPoint(measure, step, value);
+      }
+      lastDrawPos.current = { x, y };
+    } else if (drawMode === 'erase') {
+      eraseNear(x, y);
+    }
+  }, [drawing, drawMode, getCanvasPos, xToMeasureStep, onSetPoint, interpolateAndSet, eraseNear]);
 
   const handleMouseUp = useCallback(() => {
     setDrawing(false);
+    lastDrawPos.current = null;
   }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setDrawing(false);
+    lastDrawPos.current = null;
+    setHoverPos(null);
+    setLinePreview(null);
+  }, []);
+
+  // Cursor style based on draw mode
+  const cursorStyle: React.CSSProperties = {
+    width: totalWidth,
+    height: LANE_HEIGHT,
+    cursor:
+      drawMode === 'erase' ? 'not-allowed' :
+      drawMode === 'freehand' ? 'crosshair' :
+      drawMode === 'line' && lineAnchor.current ? 'crosshair' :
+      'default',
+  };
 
   return (
     <div className={`automation-lane-row${lane.enabled ? '' : ' disabled'}`}>
@@ -366,11 +582,11 @@ const AutomationLaneRow = React.memo<AutomationLaneRowProps>(function Automation
         <canvas
           ref={canvasRef}
           className="automation-lane-canvas"
-          style={{ width: totalWidth, height: LANE_HEIGHT }}
+          style={cursorStyle}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
           onContextMenu={(e) => e.preventDefault()}
         />
       </div>

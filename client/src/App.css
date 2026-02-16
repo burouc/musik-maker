@@ -1726,6 +1726,43 @@
   color: var(--text-primary);
 }
 
+.automation-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.automation-draw-mode-group {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.automation-draw-mode-btn {
+  padding: 3px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: var(--font-mono);
+}
+
+.automation-draw-mode-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.automation-draw-mode-btn.active {
+  background: #4ecdc4;
+  color: #1a1a2e;
+}
+
 .automation-add-controls {
   display: flex;
   align-items: center;
