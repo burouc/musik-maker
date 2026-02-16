@@ -33,6 +33,8 @@ export interface Pattern {
   /** Number of steps in this pattern (1–64, default 16) */
   stepCount: number;
   tracks: Track[];
+  /** Sample-based tracks in this pattern */
+  sampleTracks: SampleTrack[];
   pianoRoll: PianoRollData;
   /** Synth voice settings for this pattern's piano roll */
   synthSettings: SynthSettings;
@@ -177,11 +179,52 @@ export interface SynthSettings {
   filterEnvAmount: number;
 }
 
+/** Supported audio file formats for sample loading */
+export type SampleFormat = 'wav' | 'mp3' | 'ogg';
+
+/** A loaded audio sample that can be used as an instrument */
+export interface SampleInstrument {
+  /** Unique identifier for this sample */
+  id: string;
+  /** Display name (derived from filename) */
+  name: string;
+  /** The decoded AudioBuffer (not serializable, managed by AudioEngine) */
+  /** Object URL for the loaded file (used as a key to retrieve the buffer) */
+  url: string;
+  /** Original filename */
+  fileName: string;
+}
+
+/** A sample-based track in the step sequencer */
+export interface SampleTrack {
+  id: string;
+  name: string;
+  /** Reference to a loaded sample instrument */
+  sampleId: string | null;
+  /** Per-step velocity: 0 = off, 0.01–1.0 = on with that velocity */
+  steps: number[];
+  /** Per-step pitch offset in semitones (−12 to +12, default 0) */
+  pitches: number[];
+  volume: number;
+  /** Stereo pan position: −1 (full left) to +1 (full right), 0 = center */
+  pan: number;
+  muted: boolean;
+  solo: boolean;
+  /** Reverb send level: 0 (dry) to 1 (full send) */
+  reverbSend: number;
+  /** Delay send level: 0 (dry) to 1 (full send) */
+  delaySend: number;
+  /** Filter send level: 0 (dry) to 1 (full send) */
+  filterSend: number;
+}
+
 export type PlaybackMode = 'pattern' | 'song';
 
 export interface SequencerState {
   patterns: Pattern[];
   activePatternId: string;
+  /** Loaded sample instruments available across all patterns */
+  samples: SampleInstrument[];
   arrangement: ArrangementTrack[];
   arrangementLength: number;
   bpm: number;

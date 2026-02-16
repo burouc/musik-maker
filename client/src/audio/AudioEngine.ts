@@ -1,4 +1,14 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, SynthSettings, OscillatorType } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, SynthSettings, OscillatorType, SampleFormat } from '../types';
+
+/** Accepted MIME types for sample loading */
+const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {
+  wav: 'audio/wav',
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+};
+
+export const ACCEPTED_SAMPLE_EXTENSIONS: SampleFormat[] = ['wav', 'mp3', 'ogg'];
+export const ACCEPTED_SAMPLE_MIME_TYPES = Object.values(SAMPLE_MIME_TYPES).join(',');
 
 class AudioEngine {
   private context: AudioContext;
@@ -30,6 +40,14 @@ class AudioEngine {
   private filterBus: GainNode;
   private filterNode: BiquadFilterNode;
   private filterReturnGain: GainNode;
+
+  // Sample playback
+  private sampleBuffers: Map<string, AudioBuffer> = new Map();
+  private samplePanners: Map<string, StereoPannerNode> = new Map();
+  private sampleAnalysers: Map<string, AnalyserNode> = new Map();
+  private sampleReverbSendGains: Map<string, GainNode> = new Map();
+  private sampleDelaySendGains: Map<string, GainNode> = new Map();
+  private sampleFilterSendGains: Map<string, GainNode> = new Map();
 
   constructor() {
     this.context = new AudioContext();
@@ -433,6 +451,141 @@ class AudioEngine {
     }
     if (params.resonance !== undefined) {
       this.filterNode.Q.value = Math.max(0.1, Math.min(25, params.resonance));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sample playback
+  // ---------------------------------------------------------------------------
+
+  /** Load an audio file into an AudioBuffer and cache it by URL. */
+  async loadSample(url: string): Promise<AudioBuffer> {
+    const cached = this.sampleBuffers.get(url);
+    if (cached) return cached;
+
+    await this.resume();
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+    this.sampleBuffers.set(url, audioBuffer);
+    return audioBuffer;
+  }
+
+  /** Remove a cached sample buffer. */
+  removeSample(url: string): void {
+    this.sampleBuffers.delete(url);
+  }
+
+  /** Check if a sample is loaded. */
+  hasSample(url: string): boolean {
+    return this.sampleBuffers.has(url);
+  }
+
+  /** Ensure a sample track channel exists (panner, analyser, send gains). */
+  ensureSampleChannel(trackId: string): void {
+    if (this.samplePanners.has(trackId)) return;
+
+    const analyser = this.context.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.3;
+
+    const panner = this.context.createStereoPanner();
+    panner.connect(analyser);
+    analyser.connect(this.masterGain);
+
+    const reverbSend = this.context.createGain();
+    reverbSend.gain.value = 0;
+    panner.connect(reverbSend);
+    reverbSend.connect(this.reverbBus);
+
+    const delaySend = this.context.createGain();
+    delaySend.gain.value = 0;
+    panner.connect(delaySend);
+    delaySend.connect(this.delayBus);
+
+    const filterSend = this.context.createGain();
+    filterSend.gain.value = 0;
+    panner.connect(filterSend);
+    filterSend.connect(this.filterBus);
+
+    this.samplePanners.set(trackId, panner);
+    this.sampleAnalysers.set(trackId, analyser);
+    this.sampleReverbSendGains.set(trackId, reverbSend);
+    this.sampleDelaySendGains.set(trackId, delaySend);
+    this.sampleFilterSendGains.set(trackId, filterSend);
+  }
+
+  /** Remove a sample track channel. */
+  removeSampleChannel(trackId: string): void {
+    this.samplePanners.get(trackId)?.disconnect();
+    this.sampleAnalysers.get(trackId)?.disconnect();
+    this.sampleReverbSendGains.get(trackId)?.disconnect();
+    this.sampleDelaySendGains.get(trackId)?.disconnect();
+    this.sampleFilterSendGains.get(trackId)?.disconnect();
+    this.samplePanners.delete(trackId);
+    this.sampleAnalysers.delete(trackId);
+    this.sampleReverbSendGains.delete(trackId);
+    this.sampleDelaySendGains.delete(trackId);
+    this.sampleFilterSendGains.delete(trackId);
+  }
+
+  /** Play a loaded sample on a sample track channel. */
+  async playSample(sampleUrl: string, trackId: string, volume: number, pitchOffset: number = 0): Promise<void> {
+    await this.resume();
+    const buffer = this.sampleBuffers.get(sampleUrl);
+    if (!buffer) return;
+
+    this.ensureSampleChannel(trackId);
+    const output = this.samplePanners.get(trackId) ?? this.masterGain;
+
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = this.pitchRatio(pitchOffset);
+
+    const gain = this.context.createGain();
+    gain.gain.value = volume;
+
+    source.connect(gain);
+    gain.connect(output);
+    source.start();
+  }
+
+  /** Set pan for a sample track channel. */
+  setSampleChannelPan(trackId: string, value: number): void {
+    const panner = this.samplePanners.get(trackId);
+    if (panner) {
+      panner.pan.value = Math.max(-1, Math.min(1, value));
+    }
+  }
+
+  /** Get peak level for a sample track channel. */
+  getSampleChannelLevel(trackId: string): number {
+    const analyser = this.sampleAnalysers.get(trackId);
+    if (!analyser) return 0;
+    return this.readPeak(analyser);
+  }
+
+  /** Set reverb send for a sample track channel. */
+  setSampleChannelReverbSend(trackId: string, value: number): void {
+    const sendGain = this.sampleReverbSendGains.get(trackId);
+    if (sendGain) {
+      sendGain.gain.value = Math.max(0, Math.min(1, value));
+    }
+  }
+
+  /** Set delay send for a sample track channel. */
+  setSampleChannelDelaySend(trackId: string, value: number): void {
+    const sendGain = this.sampleDelaySendGains.get(trackId);
+    if (sendGain) {
+      sendGain.gain.value = Math.max(0, Math.min(1, value));
+    }
+  }
+
+  /** Set filter send for a sample track channel. */
+  setSampleChannelFilterSend(trackId: string, value: number): void {
+    const sendGain = this.sampleFilterSendGains.get(trackId);
+    if (sendGain) {
+      sendGain.gain.value = Math.max(0, Math.min(1, value));
     }
   }
 

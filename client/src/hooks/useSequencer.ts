@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type {
   InstrumentName,
   Track,
+  SampleTrack,
+  SampleInstrument,
   Pattern,
   ArrangementTrack,
   ArrangementBlock,
@@ -73,6 +75,7 @@ function createPattern(index: number): Pattern {
     color: PATTERN_COLORS[index % PATTERN_COLORS.length],
     stepCount: DEFAULT_STEP_COUNT,
     tracks: createDefaultTracks(),
+    sampleTracks: [],
     pianoRoll: { notes: [] },
     synthSettings: { ...DEFAULT_SYNTH_SETTINGS },
   };
@@ -93,6 +96,7 @@ const firstPattern = createPattern(0);
 const INITIAL_STATE: SequencerState = {
   patterns: [firstPattern],
   activePatternId: firstPattern.id,
+  samples: [],
   arrangement: DEFAULT_ARRANGEMENT_TRACKS,
   arrangementLength: 16,
   bpm: 120,
@@ -154,6 +158,22 @@ function useSequencer() {
               if (!effectivelyMuted) {
                 const pitchOffset = track.pitches?.[nextStep] ?? 0;
                 audioEngine.current.playSound(track.id, track.volume * stepVelocity, pitchOffset);
+              }
+            }
+
+            // Play sample tracks at this step
+            const anySampleSoloed = pattern.sampleTracks.some((t) => t.solo);
+            for (const sTrack of pattern.sampleTracks) {
+              const stepVelocity = sTrack.steps[nextStep];
+              if (stepVelocity <= 0) continue;
+              const effectivelyMuted =
+                sTrack.muted || (anySampleSoloed && !sTrack.solo);
+              if (!effectivelyMuted && sTrack.sampleId) {
+                const sample = current.samples.find((s) => s.id === sTrack.sampleId);
+                if (sample) {
+                  const pitchOffset = sTrack.pitches?.[nextStep] ?? 0;
+                  audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * stepVelocity, pitchOffset);
+                }
               }
             }
 
@@ -220,6 +240,22 @@ function useSequencer() {
                     if (!effectivelyMuted) {
                       const pitchOffset = track.pitches?.[nextStep] ?? 0;
                       audioEngine.current.playSound(track.id, track.volume * stepVelocity, pitchOffset);
+                    }
+                  }
+
+                  // Play sample tracks in song mode
+                  const anySampleSoloed2 = pattern.sampleTracks.some((t) => t.solo);
+                  for (const sTrack of pattern.sampleTracks) {
+                    const sVelocity = sTrack.steps[nextStep];
+                    if (sVelocity <= 0) continue;
+                    const sEffectivelyMuted =
+                      sTrack.muted || (anySampleSoloed2 && !sTrack.solo);
+                    if (!sEffectivelyMuted && sTrack.sampleId) {
+                      const sample = current.samples.find((s) => s.id === sTrack.sampleId);
+                      if (sample) {
+                        const sPitchOffset = sTrack.pitches?.[nextStep] ?? 0;
+                        audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * sVelocity, sPitchOffset);
+                      }
                     }
                   }
 
@@ -324,6 +360,7 @@ function useSequencer() {
         color: PATTERN_COLORS[prev.patterns.length % PATTERN_COLORS.length],
         stepCount: source.stepCount,
         tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches] })),
+        sampleTracks: source.sampleTracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches] })),
         pianoRoll: { notes: source.pianoRoll.notes.map((n) => ({ ...n })) },
         synthSettings: { ...source.synthSettings },
       };
@@ -580,14 +617,26 @@ function useSequencer() {
           stepCount: clamped,
           tracks: pattern.tracks.map((track) => {
             if (clamped > oldCount) {
-              // Extend: pad with 0 (off)
               return {
                 ...track,
                 steps: [...track.steps, ...Array(clamped - oldCount).fill(0)],
                 pitches: [...track.pitches, ...Array(clamped - oldCount).fill(0)],
               };
             }
-            // Shrink: truncate
+            return {
+              ...track,
+              steps: track.steps.slice(0, clamped),
+              pitches: track.pitches.slice(0, clamped),
+            };
+          }),
+          sampleTracks: pattern.sampleTracks.map((track) => {
+            if (clamped > oldCount) {
+              return {
+                ...track,
+                steps: [...track.steps, ...Array(clamped - oldCount).fill(0)],
+                pitches: [...track.pitches, ...Array(clamped - oldCount).fill(0)],
+              };
+            }
             return {
               ...track,
               steps: track.steps.slice(0, clamped),
@@ -927,6 +976,328 @@ function useSequencer() {
     }));
   }, []);
 
+  // -----------------------------------------------------------------------
+  // Sample management
+  // -----------------------------------------------------------------------
+
+  const loadSample = useCallback(async (file: File): Promise<SampleInstrument | null> => {
+    const url = URL.createObjectURL(file);
+    try {
+      await audioEngine.current.loadSample(url);
+    } catch {
+      URL.revokeObjectURL(url);
+      return null;
+    }
+    const sample: SampleInstrument = {
+      id: `sample-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: file.name.replace(/\.[^.]+$/, ''),
+      url,
+      fileName: file.name,
+    };
+    setState((prev) => ({
+      ...prev,
+      samples: [...prev.samples, sample],
+    }));
+    return sample;
+  }, []);
+
+  const removeSampleInstrument = useCallback((sampleId: string) => {
+    setState((prev) => {
+      const sample = prev.samples.find((s) => s.id === sampleId);
+      if (sample) {
+        audioEngine.current.removeSample(sample.url);
+        URL.revokeObjectURL(sample.url);
+      }
+      return {
+        ...prev,
+        samples: prev.samples.filter((s) => s.id !== sampleId),
+        // Clear any sample track references to this sample
+        patterns: prev.patterns.map((pattern) => ({
+          ...pattern,
+          sampleTracks: pattern.sampleTracks.map((t) =>
+            t.sampleId === sampleId ? { ...t, sampleId: null } : t,
+          ),
+        })),
+      };
+    });
+  }, []);
+
+  const addSampleTrack = useCallback(() => {
+    setState((prev) => {
+      const pattern = prev.patterns.find((p) => p.id === prev.activePatternId);
+      if (!pattern) return prev;
+      const trackId = `strack-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      audioEngine.current.ensureSampleChannel(trackId);
+      const newTrack: SampleTrack = {
+        id: trackId,
+        name: `Sample ${pattern.sampleTracks.length + 1}`,
+        sampleId: null,
+        steps: Array(pattern.stepCount).fill(0),
+        pitches: Array(pattern.stepCount).fill(0),
+        volume: 0.8,
+        pan: 0,
+        muted: false,
+        solo: false,
+        reverbSend: 0,
+        delaySend: 0,
+        filterSend: 0,
+      };
+      return {
+        ...prev,
+        patterns: prev.patterns.map((p) =>
+          p.id === prev.activePatternId
+            ? { ...p, sampleTracks: [...p.sampleTracks, newTrack] }
+            : p,
+        ),
+      };
+    });
+  }, []);
+
+  const removeSampleTrack = useCallback((trackId: string) => {
+    audioEngine.current.removeSampleChannel(trackId);
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? { ...pattern, sampleTracks: pattern.sampleTracks.filter((t) => t.id !== trackId) }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackSample = useCallback((trackId: string, sampleId: string | null) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((t) =>
+                t.id === trackId ? { ...t, sampleId } : t,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const toggleSampleStep = useCallback((trackId: string, stepIndex: number) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId
+                  ? {
+                      ...track,
+                      steps: track.steps.map((v, i) =>
+                        i === stepIndex ? (v > 0 ? 0 : DEFAULT_VELOCITY) : v,
+                      ),
+                    }
+                  : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleStepVelocity = useCallback(
+    (trackId: string, stepIndex: number, velocity: number) => {
+      const clamped = Math.max(0, Math.min(1, velocity));
+      setState((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
+            ? {
+                ...pattern,
+                sampleTracks: pattern.sampleTracks.map((track) =>
+                  track.id === trackId
+                    ? {
+                        ...track,
+                        steps: track.steps.map((v, i) =>
+                          i === stepIndex ? clamped : v,
+                        ),
+                      }
+                    : track,
+                ),
+              }
+            : pattern,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const setSampleStepPitch = useCallback(
+    (trackId: string, stepIndex: number, pitch: number) => {
+      const clamped = Math.round(Math.max(-12, Math.min(12, pitch)));
+      setState((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
+            ? {
+                ...pattern,
+                sampleTracks: pattern.sampleTracks.map((track) =>
+                  track.id === trackId
+                    ? {
+                        ...track,
+                        pitches: track.pitches.map((p, i) =>
+                          i === stepIndex ? clamped : p,
+                        ),
+                      }
+                    : track,
+                ),
+              }
+            : pattern,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const setSampleTrackVolume = useCallback((trackId: string, volume: number) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId
+                  ? { ...track, volume: Math.max(0, Math.min(1, volume)) }
+                  : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackPan = useCallback((trackId: string, pan: number) => {
+    const clamped = Math.max(-1, Math.min(1, pan));
+    audioEngine.current.setSampleChannelPan(trackId, clamped);
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, pan: clamped } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const toggleSampleMute = useCallback((trackId: string) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, muted: !track.muted } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const toggleSampleSolo = useCallback((trackId: string) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, solo: !track.solo } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const clearSampleTrack = useCallback((trackId: string) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId
+                  ? { ...track, steps: Array(pattern.stepCount).fill(0), pitches: Array(pattern.stepCount).fill(0) }
+                  : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackReverbSend = useCallback((trackId: string, send: number) => {
+    const clamped = Math.max(0, Math.min(1, send));
+    audioEngine.current.setSampleChannelReverbSend(trackId, clamped);
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, reverbSend: clamped } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackDelaySend = useCallback((trackId: string, send: number) => {
+    const clamped = Math.max(0, Math.min(1, send));
+    audioEngine.current.setSampleChannelDelaySend(trackId, clamped);
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, delaySend: clamped } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackFilterSend = useCallback((trackId: string, send: number) => {
+    const clamped = Math.max(0, Math.min(1, send));
+    audioEngine.current.setSampleChannelFilterSend(trackId, clamped);
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, filterSend: clamped } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
   const setSynthSettings = useCallback((params: Partial<SynthSettings>) => {
     setState((prev) => ({
       ...prev,
@@ -941,10 +1312,12 @@ function useSequencer() {
   // Derive active pattern tracks for component consumption
   const activePattern = getActivePattern(state);
   const tracks = activePattern?.tracks ?? [];
+  const sampleTracks = activePattern?.sampleTracks ?? [];
 
   return {
     state,
     tracks,
+    sampleTracks,
     activePattern,
     audioEngine: audioEngine.current,
     toggleStep,
@@ -985,6 +1358,23 @@ function useSequencer() {
     setTrackFilterSend,
     setMasterFilter,
     setSynthSettings,
+    // Sample management
+    loadSample,
+    removeSampleInstrument,
+    addSampleTrack,
+    removeSampleTrack,
+    setSampleTrackSample,
+    toggleSampleStep,
+    setSampleStepVelocity,
+    setSampleStepPitch,
+    setSampleTrackVolume,
+    setSampleTrackPan,
+    toggleSampleMute,
+    toggleSampleSolo,
+    clearSampleTrack,
+    setSampleTrackReverbSend,
+    setSampleTrackDelaySend,
+    setSampleTrackFilterSend,
   };
 }
 

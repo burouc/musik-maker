@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import type { InstrumentName, Track, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType } from '../types';
+import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
 const DELAY_SYNC_OPTIONS: { value: DelaySync; label: string }[] = [
@@ -19,6 +19,7 @@ const FILTER_TYPE_OPTIONS: { value: FilterType; label: string }[] = [
 
 interface MixerProps {
   tracks: Track[];
+  sampleTracks: SampleTrack[];
   masterVolume: number;
   masterReverb: ReverbSettings;
   masterDelay: DelaySettings;
@@ -36,6 +37,14 @@ interface MixerProps {
   onSetMasterDelay: (params: Partial<DelaySettings>) => void;
   onSetFilterSend: (trackId: InstrumentName, send: number) => void;
   onSetMasterFilter: (params: Partial<FilterSettings>) => void;
+  onSetSampleVolume: (trackId: string, volume: number) => void;
+  onSetSamplePan: (trackId: string, pan: number) => void;
+  onToggleSampleMute: (trackId: string) => void;
+  onToggleSampleSolo: (trackId: string) => void;
+  onClearSampleTrack: (trackId: string) => void;
+  onSetSampleReverbSend: (trackId: string, send: number) => void;
+  onSetSampleDelaySend: (trackId: string, send: number) => void;
+  onSetSampleFilterSend: (trackId: string, send: number) => void;
 }
 
 /** Number of LED segments in each VU meter */
@@ -80,6 +89,7 @@ VuMeter.displayName = 'VuMeter';
 
 const Mixer: React.FC<MixerProps> = ({
   tracks,
+  sampleTracks,
   masterVolume,
   masterReverb,
   masterDelay,
@@ -97,6 +107,14 @@ const Mixer: React.FC<MixerProps> = ({
   onSetMasterDelay,
   onSetFilterSend,
   onSetMasterFilter,
+  onSetSampleVolume,
+  onSetSamplePan,
+  onToggleSampleMute,
+  onToggleSampleSolo,
+  onClearSampleTrack,
+  onSetSampleReverbSend,
+  onSetSampleDelaySend,
+  onSetSampleFilterSend,
 }) => {
   const rafRef = useRef<number>(0);
   const mixerRef = useRef<HTMLDivElement>(null);
@@ -114,9 +132,14 @@ const Mixer: React.FC<MixerProps> = ({
       const id = meter.dataset.meterId;
       if (!id) return;
 
-      const level = id === 'master'
-        ? audioEngine.getMasterLevel()
-        : audioEngine.getChannelLevel(id as InstrumentName);
+      let level: number;
+      if (id === 'master') {
+        level = audioEngine.getMasterLevel();
+      } else if (id.startsWith('strack-')) {
+        level = audioEngine.getSampleChannelLevel(id);
+      } else {
+        level = audioEngine.getChannelLevel(id as InstrumentName);
+      }
 
       const segments = meter.querySelectorAll<HTMLDivElement>('.vu-segment');
       segments.forEach((seg) => {
@@ -220,6 +243,96 @@ const Mixer: React.FC<MixerProps> = ({
           <button
             className="mixer-btn clear-btn"
             onClick={() => onClearTrack(track.id)}
+          >
+            CLR
+          </button>
+        </div>
+      ))}
+
+      {sampleTracks.map((track) => (
+        <div key={track.id} className="mixer-channel sample-mixer-channel">
+          <label className="mixer-channel-name">{track.name}</label>
+          <div className="mixer-meter-and-slider">
+            <VuMeter meterId={track.id} />
+            <input
+              type="range"
+              className="mixer-volume-slider"
+              min={0}
+              max={1}
+              step={0.01}
+              value={track.volume}
+              onChange={(e) => onSetSampleVolume(track.id, parseFloat(e.target.value))}
+            />
+          </div>
+          <span className="mixer-volume-display">
+            {Math.round(track.volume * 100)}%
+          </span>
+          <input
+            type="range"
+            className="mixer-pan-slider"
+            min={-1}
+            max={1}
+            step={0.01}
+            value={track.pan}
+            onChange={(e) => onSetSamplePan(track.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-pan-display">
+            {track.pan === 0 ? 'C' : track.pan < 0 ? `L${Math.round(Math.abs(track.pan) * 100)}` : `R${Math.round(track.pan * 100)}`}
+          </span>
+          <label className="mixer-reverb-label">REV</label>
+          <input
+            type="range"
+            className="mixer-reverb-slider"
+            min={0}
+            max={1}
+            step={0.01}
+            value={track.reverbSend}
+            onChange={(e) => onSetSampleReverbSend(track.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-reverb-display">
+            {Math.round(track.reverbSend * 100)}%
+          </span>
+          <label className="mixer-delay-label">DLY</label>
+          <input
+            type="range"
+            className="mixer-delay-slider"
+            min={0}
+            max={1}
+            step={0.01}
+            value={track.delaySend}
+            onChange={(e) => onSetSampleDelaySend(track.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-delay-display">
+            {Math.round(track.delaySend * 100)}%
+          </span>
+          <label className="mixer-filter-label">FLT</label>
+          <input
+            type="range"
+            className="mixer-filter-slider"
+            min={0}
+            max={1}
+            step={0.01}
+            value={track.filterSend}
+            onChange={(e) => onSetSampleFilterSend(track.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-filter-display">
+            {Math.round(track.filterSend * 100)}%
+          </span>
+          <button
+            className={`mixer-btn mute-btn${track.muted ? ' active' : ''}`}
+            onClick={() => onToggleSampleMute(track.id)}
+          >
+            M
+          </button>
+          <button
+            className={`mixer-btn solo-btn${track.solo ? ' active' : ''}`}
+            onClick={() => onToggleSampleSolo(track.id)}
+          >
+            S
+          </button>
+          <button
+            className="mixer-btn clear-btn"
+            onClick={() => onClearSampleTrack(track.id)}
           >
             CLR
           </button>

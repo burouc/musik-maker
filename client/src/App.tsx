@@ -11,6 +11,7 @@ function App() {
   const {
     state,
     tracks,
+    sampleTracks,
     toggleStep,
     setStepVelocity,
     setStepPitch,
@@ -50,6 +51,22 @@ function App() {
     setSynthSettings,
     activePattern,
     audioEngine,
+    // Sample management
+    loadSample,
+    addSampleTrack,
+    removeSampleTrack,
+    setSampleTrackSample,
+    toggleSampleStep,
+    setSampleStepVelocity,
+    setSampleStepPitch,
+    setSampleTrackVolume,
+    setSampleTrackPan,
+    toggleSampleMute,
+    toggleSampleSolo,
+    clearSampleTrack,
+    setSampleTrackReverbSend,
+    setSampleTrackDelaySend,
+    setSampleTrackFilterSend,
   } = useSequencer();
 
   return (
@@ -80,6 +97,8 @@ function App() {
 
       <StepSequencer
         tracks={tracks}
+        sampleTracks={sampleTracks}
+        samples={state.samples}
         stepCount={activePattern?.stepCount ?? 16}
         currentStep={state.currentStep}
         isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
@@ -87,10 +106,18 @@ function App() {
         onSetStepVelocity={setStepVelocity}
         onSetStepPitch={setStepPitch}
         onStepCountChange={setPatternStepCount}
+        onToggleSampleStep={toggleSampleStep}
+        onSetSampleStepVelocity={setSampleStepVelocity}
+        onSetSampleStepPitch={setSampleStepPitch}
+        onSetSampleTrackSample={setSampleTrackSample}
+        onLoadSample={loadSample}
+        onAddSampleTrack={addSampleTrack}
+        onRemoveSampleTrack={removeSampleTrack}
       />
 
       <Mixer
         tracks={tracks}
+        sampleTracks={sampleTracks}
         masterVolume={state.masterVolume}
         masterReverb={state.masterReverb}
         masterDelay={state.masterDelay}
@@ -108,6 +135,14 @@ function App() {
         onSetMasterDelay={setMasterDelay}
         onSetFilterSend={setTrackFilterSend}
         onSetMasterFilter={setMasterFilter}
+        onSetSampleVolume={setSampleTrackVolume}
+        onSetSamplePan={setSampleTrackPan}
+        onToggleSampleMute={toggleSampleMute}
+        onToggleSampleSolo={toggleSampleSolo}
+        onClearSampleTrack={clearSampleTrack}
+        onSetSampleReverbSend={setSampleTrackReverbSend}
+        onSetSampleDelaySend={setSampleTrackDelaySend}
+        onSetSampleFilterSend={setSampleTrackFilterSend}
       />
 
       {activePattern && (
