@@ -172,28 +172,48 @@ class AudioEngine {
     const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
 
     const osc1Type: OscillatorType = settings?.oscType ?? 'sawtooth';
+    const osc1Octave = settings?.oscOctave ?? 0;
     const osc2Type: OscillatorType = settings?.osc2Type ?? 'sawtooth';
     const detuneCents = settings?.osc2Detune ?? 7;
+    const osc2Octave = settings?.osc2Octave ?? 0;
     const osc2Mix = settings?.osc2Mix ?? 0.5;
+    const osc3Enabled = settings?.osc3Enabled ?? false;
+    const osc3Type: OscillatorType = settings?.osc3Type ?? 'square';
+    const osc3Detune = settings?.osc3Detune ?? 0;
+    const osc3Octave = settings?.osc3Octave ?? 0;
+    const osc3Mix = settings?.osc3Mix ?? 0;
     const cutoff = settings?.filterCutoff ?? Math.min(freq * 4, 12000);
     const resonance = settings?.filterResonance ?? 1;
 
-    // Oscillator 1
+    // Oscillator 1 (with octave offset)
     const osc1 = this.context.createOscillator();
     osc1.type = osc1Type;
-    osc1.frequency.setValueAtTime(freq, now);
+    osc1.frequency.setValueAtTime(freq * Math.pow(2, osc1Octave), now);
 
-    // Oscillator 2 (detuned)
+    // Oscillator 2 (detuned, with octave offset)
     const osc2 = this.context.createOscillator();
     osc2.type = osc2Type;
-    osc2.frequency.setValueAtTime(freq, now);
+    osc2.frequency.setValueAtTime(freq * Math.pow(2, osc2Octave), now);
     osc2.detune.setValueAtTime(detuneCents, now);
 
-    // Oscillator mix gains
+    // Oscillator mix gains (distribute between osc1/osc2, with osc3 mixed in additively)
     const osc1Gain = this.context.createGain();
     osc1Gain.gain.value = 1 - osc2Mix;
     const osc2Gain = this.context.createGain();
     osc2Gain.gain.value = osc2Mix;
+
+    // Oscillator 3 (optional, with its own detune and octave)
+    let osc3: OscillatorNode | null = null;
+    let osc3Gain: GainNode | null = null;
+    if (osc3Enabled && osc3Mix > 0) {
+      osc3 = this.context.createOscillator();
+      osc3.type = osc3Type;
+      osc3.frequency.setValueAtTime(freq * Math.pow(2, osc3Octave), now);
+      osc3.detune.setValueAtTime(osc3Detune, now);
+
+      osc3Gain = this.context.createGain();
+      osc3Gain.gain.value = osc3Mix;
+    }
 
     // Low-pass filter (subtractive)
     const filter = this.context.createBiquadFilter();
@@ -248,6 +268,10 @@ class AudioEngine {
     osc2.connect(osc2Gain);
     osc1Gain.connect(filter);
     osc2Gain.connect(filter);
+    if (osc3 && osc3Gain) {
+      osc3.connect(osc3Gain);
+      osc3Gain.connect(filter);
+    }
     filter.connect(gain);
     gain.connect(this.masterGain);
 
@@ -255,6 +279,10 @@ class AudioEngine {
     osc2.start(now);
     osc1.stop(releaseEnd + 0.01);
     osc2.stop(releaseEnd + 0.01);
+    if (osc3) {
+      osc3.start(now);
+      osc3.stop(releaseEnd + 0.01);
+    }
   }
 
   async playSound(instrument: InstrumentName, volume: number, pitchOffset: number = 0): Promise<void> {

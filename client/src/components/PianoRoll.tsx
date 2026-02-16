@@ -615,6 +615,20 @@ function PianoRoll({
           </div>
 
           <div className="synth-control-group">
+            <label className="synth-label">Oct 1</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={-2}
+              max={2}
+              step={1}
+              value={synthSettings.oscOctave}
+              onChange={(e) => onSynthSettingsChange({ oscOctave: Number(e.target.value) })}
+              title={`Octave: ${synthSettings.oscOctave > 0 ? '+' : ''}${synthSettings.oscOctave}`}
+            />
+          </div>
+
+          <div className="synth-control-group">
             <label className="synth-label">OSC 2</label>
             <div className="synth-osc-buttons">
               {OSC_TYPES.map((t) => (
@@ -628,6 +642,20 @@ function PianoRoll({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Oct 2</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={-2}
+              max={2}
+              step={1}
+              value={synthSettings.osc2Octave}
+              onChange={(e) => onSynthSettingsChange({ osc2Octave: Number(e.target.value) })}
+              title={`Octave: ${synthSettings.osc2Octave > 0 ? '+' : ''}${synthSettings.osc2Octave}`}
+            />
           </div>
 
           <div className="synth-control-group">
@@ -653,6 +681,75 @@ function PianoRoll({
               value={Math.round(synthSettings.osc2Mix * 100)}
               onChange={(e) => onSynthSettingsChange({ osc2Mix: Number(e.target.value) / 100 })}
               title={`${Math.round(synthSettings.osc2Mix * 100)}%`}
+            />
+          </div>
+
+          <div className="synth-control-divider" />
+
+          <div className="synth-control-group">
+            <label className="synth-label">
+              <input
+                type="checkbox"
+                checked={synthSettings.osc3Enabled}
+                onChange={(e) => onSynthSettingsChange({ osc3Enabled: e.target.checked })}
+              />
+              {' OSC 3'}
+            </label>
+            <div className="synth-osc-buttons">
+              {OSC_TYPES.map((t) => (
+                <button
+                  key={t}
+                  className={`synth-osc-btn${synthSettings.osc3Type === t ? ' active' : ''}${!synthSettings.osc3Enabled ? ' disabled' : ''}`}
+                  onClick={() => synthSettings.osc3Enabled && onSynthSettingsChange({ osc3Type: t })}
+                  title={OSC_LABELS[t]}
+                  disabled={!synthSettings.osc3Enabled}
+                >
+                  {OSC_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Oct 3</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={-2}
+              max={2}
+              step={1}
+              value={synthSettings.osc3Octave}
+              onChange={(e) => onSynthSettingsChange({ osc3Octave: Number(e.target.value) })}
+              title={`Octave: ${synthSettings.osc3Octave > 0 ? '+' : ''}${synthSettings.osc3Octave}`}
+              disabled={!synthSettings.osc3Enabled}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Det 3</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={synthSettings.osc3Detune}
+              onChange={(e) => onSynthSettingsChange({ osc3Detune: Number(e.target.value) })}
+              title={`${synthSettings.osc3Detune} cents`}
+              disabled={!synthSettings.osc3Enabled}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Mix 3</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={Math.round(synthSettings.osc3Mix * 100)}
+              onChange={(e) => onSynthSettingsChange({ osc3Mix: Number(e.target.value) / 100 })}
+              title={`${Math.round(synthSettings.osc3Mix * 100)}%`}
+              disabled={!synthSettings.osc3Enabled}
             />
           </div>
 

@@ -32,9 +32,16 @@ const DEFAULT_VELOCITY = 0.8;
 
 const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
   oscType: 'sawtooth',
+  oscOctave: 0,
   osc2Type: 'sawtooth',
   osc2Detune: 7,
+  osc2Octave: 0,
   osc2Mix: 0.5,
+  osc3Type: 'square',
+  osc3Detune: 0,
+  osc3Octave: -1,
+  osc3Enabled: false,
+  osc3Mix: 0.3,
   filterCutoff: 8000,
   filterResonance: 1,
   ampAttack: 0.005,

@@ -133,12 +133,26 @@ export type OscillatorType = 'sine' | 'sawtooth' | 'square' | 'triangle';
 export interface SynthSettings {
   /** Primary oscillator waveform */
   oscType: OscillatorType;
+  /** Oscillator 1 octave offset (−2 to +2) */
+  oscOctave: number;
   /** Secondary oscillator waveform */
   osc2Type: OscillatorType;
   /** Detune amount for oscillator 2 in cents (0–100) */
   osc2Detune: number;
+  /** Oscillator 2 octave offset (−2 to +2) */
+  osc2Octave: number;
   /** Mix balance between osc1 and osc2: 0 = osc1 only, 1 = osc2 only */
   osc2Mix: number;
+  /** Third oscillator waveform */
+  osc3Type: OscillatorType;
+  /** Detune amount for oscillator 3 in cents (0–100) */
+  osc3Detune: number;
+  /** Oscillator 3 octave offset (−2 to +2) */
+  osc3Octave: number;
+  /** Oscillator 3 enabled */
+  osc3Enabled: boolean;
+  /** Oscillator 3 mix level (0–1) */
+  osc3Mix: number;
   /** Filter cutoff frequency in Hz (20–20000) */
   filterCutoff: number;
   /** Filter resonance (Q factor): 0.1–25 */
