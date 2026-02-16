@@ -310,7 +310,7 @@
           "id": "sy-03",
           "priority": "P0",
           "title": "ADSR envelope for filter cutoff",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "sy-04",

@@ -686,6 +686,71 @@ function PianoRoll({
             />
           </div>
 
+          <div className="synth-control-group">
+            <label className="synth-label">FAtk</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={2000}
+              value={Math.round(synthSettings.filterEnvAttack * 1000)}
+              onChange={(e) => onSynthSettingsChange({ filterEnvAttack: Number(e.target.value) / 1000 })}
+              title={`Filter Attack: ${synthSettings.filterEnvAttack >= 1 ? `${synthSettings.filterEnvAttack.toFixed(1)}s` : `${Math.round(synthSettings.filterEnvAttack * 1000)}ms`}`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">FDec</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={2000}
+              value={Math.round(synthSettings.filterEnvDecay * 1000)}
+              onChange={(e) => onSynthSettingsChange({ filterEnvDecay: Number(e.target.value) / 1000 })}
+              title={`Filter Decay: ${synthSettings.filterEnvDecay >= 1 ? `${synthSettings.filterEnvDecay.toFixed(1)}s` : `${Math.round(synthSettings.filterEnvDecay * 1000)}ms`}`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">FSus</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={Math.round(synthSettings.filterEnvSustain * 100)}
+              onChange={(e) => onSynthSettingsChange({ filterEnvSustain: Number(e.target.value) / 100 })}
+              title={`Filter Sustain: ${Math.round(synthSettings.filterEnvSustain * 100)}%`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">FRel</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={2000}
+              value={Math.round(synthSettings.filterEnvRelease * 1000)}
+              onChange={(e) => onSynthSettingsChange({ filterEnvRelease: Number(e.target.value) / 1000 })}
+              title={`Filter Release: ${synthSettings.filterEnvRelease >= 1 ? `${synthSettings.filterEnvRelease.toFixed(1)}s` : `${Math.round(synthSettings.filterEnvRelease * 1000)}ms`}`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">FAmt</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={Math.round(synthSettings.filterEnvAmount)}
+              onChange={(e) => onSynthSettingsChange({ filterEnvAmount: Number(e.target.value) })}
+              title={`Filter Env Amount: ${Math.round(synthSettings.filterEnvAmount)} semitones`}
+            />
+          </div>
+
           <div className="synth-control-divider" />
 
           <div className="synth-control-group">

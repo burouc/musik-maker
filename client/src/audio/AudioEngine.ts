@@ -198,8 +198,33 @@ class AudioEngine {
     // Low-pass filter (subtractive)
     const filter = this.context.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(cutoff, now);
     filter.Q.setValueAtTime(resonance, now);
+
+    // Filter envelope
+    const filterEnvAmount = settings?.filterEnvAmount ?? 0;
+    if (filterEnvAmount > 0) {
+      const fAttack = settings?.filterEnvAttack ?? 0.005;
+      const fDecay = settings?.filterEnvDecay ?? 0.3;
+      const fSustainLevel = settings?.filterEnvSustain ?? 0;
+      const fRelease = settings?.filterEnvRelease ?? 0.15;
+
+      // Envelope sweeps from cutoff up to cutoff + amount (in Hz, exponential)
+      const peakCutoff = Math.min(cutoff * Math.pow(2, filterEnvAmount / 12), 20000);
+      const sustainCutoff = cutoff + (peakCutoff - cutoff) * fSustainLevel;
+
+      const fAttackEnd = now + fAttack;
+      const fDecayEnd = fAttackEnd + fDecay;
+      const fReleaseStart = now + duration;
+      const fReleaseEnd = fReleaseStart + fRelease;
+
+      filter.frequency.setValueAtTime(cutoff, now);
+      filter.frequency.linearRampToValueAtTime(peakCutoff, fAttackEnd);
+      filter.frequency.linearRampToValueAtTime(sustainCutoff, fDecayEnd);
+      filter.frequency.setValueAtTime(sustainCutoff, fReleaseStart);
+      filter.frequency.linearRampToValueAtTime(cutoff, fReleaseEnd);
+    } else {
+      filter.frequency.setValueAtTime(cutoff, now);
+    }
 
     // ADSR envelope
     const gain = this.context.createGain();

@@ -151,6 +151,16 @@ export interface SynthSettings {
   ampSustain: number;
   /** Amplitude envelope release time in seconds (0.001–2) */
   ampRelease: number;
+  /** Filter envelope attack time in seconds (0.001–2) */
+  filterEnvAttack: number;
+  /** Filter envelope decay time in seconds (0.001–2) */
+  filterEnvDecay: number;
+  /** Filter envelope sustain level (0–1, proportion of envelope amount) */
+  filterEnvSustain: number;
+  /** Filter envelope release time in seconds (0.001–2) */
+  filterEnvRelease: number;
+  /** Filter envelope modulation amount in semitones of cutoff (0–100), controls how far above the base cutoff the envelope sweeps */
+  filterEnvAmount: number;
 }
 
 export type PlaybackMode = 'pattern' | 'song';

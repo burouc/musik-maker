@@ -41,6 +41,11 @@ const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
   ampDecay: 0.05,
   ampSustain: 0.7,
   ampRelease: 0.15,
+  filterEnvAttack: 0.005,
+  filterEnvDecay: 0.3,
+  filterEnvSustain: 0,
+  filterEnvRelease: 0.15,
+  filterEnvAmount: 0,
 };
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
