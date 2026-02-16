@@ -673,6 +673,86 @@
   cursor: pointer;
 }
 
+/* Per-channel filter send */
+.mixer-filter-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.mixer-filter-slider {
+  width: 60px;
+  accent-color: #f59e0b;
+}
+
+.mixer-filter-display {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+/* Master filter channel */
+.mixer-filter-channel {
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
+  padding-left: 12px;
+  background: var(--bg-secondary);
+  min-width: 120px;
+}
+
+.mixer-filter-title {
+  color: #f59e0b !important;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.mixer-filter-params {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.mixer-filter-param {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.mixer-filter-param label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.mixer-filter-param input[type='range'] {
+  width: 80px;
+  accent-color: #f59e0b;
+  height: 4px;
+}
+
+.mixer-filter-param span {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.mixer-filter-type-select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
 /* VU meter + volume slider side by side */
 .mixer-meter-and-slider {
   display: flex;

@@ -244,7 +244,7 @@
           "id": "fx-03",
           "priority": "P0",
           "title": "Filter (low-pass, high-pass, band-pass with resonance)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "fx-04",

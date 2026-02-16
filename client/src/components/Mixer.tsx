@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import type { InstrumentName, Track, ReverbSettings, DelaySettings, DelaySync } from '../types';
+import type { InstrumentName, Track, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
 const DELAY_SYNC_OPTIONS: { value: DelaySync; label: string }[] = [
@@ -11,11 +11,18 @@ const DELAY_SYNC_OPTIONS: { value: DelaySync; label: string }[] = [
   { value: '1/8T', label: '1/8T' },
 ];
 
+const FILTER_TYPE_OPTIONS: { value: FilterType; label: string }[] = [
+  { value: 'lowpass', label: 'LP' },
+  { value: 'highpass', label: 'HP' },
+  { value: 'bandpass', label: 'BP' },
+];
+
 interface MixerProps {
   tracks: Track[];
   masterVolume: number;
   masterReverb: ReverbSettings;
   masterDelay: DelaySettings;
+  masterFilter: FilterSettings;
   audioEngine: AudioEngine;
   onSetVolume: (trackId: InstrumentName, volume: number) => void;
   onSetPan: (trackId: InstrumentName, pan: number) => void;
@@ -27,6 +34,8 @@ interface MixerProps {
   onSetMasterReverb: (params: Partial<ReverbSettings>) => void;
   onSetDelaySend: (trackId: InstrumentName, send: number) => void;
   onSetMasterDelay: (params: Partial<DelaySettings>) => void;
+  onSetFilterSend: (trackId: InstrumentName, send: number) => void;
+  onSetMasterFilter: (params: Partial<FilterSettings>) => void;
 }
 
 /** Number of LED segments in each VU meter */
@@ -74,6 +83,7 @@ const Mixer: React.FC<MixerProps> = ({
   masterVolume,
   masterReverb,
   masterDelay,
+  masterFilter,
   audioEngine,
   onSetVolume,
   onSetPan,
@@ -85,6 +95,8 @@ const Mixer: React.FC<MixerProps> = ({
   onSetMasterReverb,
   onSetDelaySend,
   onSetMasterDelay,
+  onSetFilterSend,
+  onSetMasterFilter,
 }) => {
   const rafRef = useRef<number>(0);
   const mixerRef = useRef<HTMLDivElement>(null);
@@ -179,6 +191,19 @@ const Mixer: React.FC<MixerProps> = ({
           />
           <span className="mixer-delay-display">
             {Math.round(track.delaySend * 100)}%
+          </span>
+          <label className="mixer-filter-label">FLT</label>
+          <input
+            type="range"
+            className="mixer-filter-slider"
+            min={0}
+            max={1}
+            step={0.01}
+            value={track.filterSend}
+            onChange={(e) => onSetFilterSend(track.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-filter-display">
+            {Math.round(track.filterSend * 100)}%
           </span>
           <button
             className={`mixer-btn mute-btn${track.muted ? ' active' : ''}`}
@@ -300,6 +325,48 @@ const Mixer: React.FC<MixerProps> = ({
               onChange={(e) => onSetMasterDelay({ mix: parseFloat(e.target.value) })}
             />
             <span>{Math.round(masterDelay.mix * 100)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mixer-channel mixer-filter-channel">
+        <label className="mixer-channel-name mixer-filter-title">Filter</label>
+        <div className="mixer-filter-params">
+          <div className="mixer-filter-param">
+            <label>Type</label>
+            <select
+              className="mixer-filter-type-select"
+              value={masterFilter.type}
+              onChange={(e) => onSetMasterFilter({ type: e.target.value as FilterType })}
+            >
+              {FILTER_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mixer-filter-param">
+            <label>Cutoff</label>
+            <input
+              type="range"
+              min={20}
+              max={20000}
+              step={1}
+              value={masterFilter.cutoff}
+              onChange={(e) => onSetMasterFilter({ cutoff: parseFloat(e.target.value) })}
+            />
+            <span>{masterFilter.cutoff >= 1000 ? `${(masterFilter.cutoff / 1000).toFixed(1)}k` : `${Math.round(masterFilter.cutoff)}`}Hz</span>
+          </div>
+          <div className="mixer-filter-param">
+            <label>Resonance</label>
+            <input
+              type="range"
+              min={0.1}
+              max={25}
+              step={0.1}
+              value={masterFilter.resonance}
+              onChange={(e) => onSetMasterFilter({ resonance: parseFloat(e.target.value) })}
+            />
+            <span>{masterFilter.resonance.toFixed(1)}</span>
           </div>
         </div>
       </div>

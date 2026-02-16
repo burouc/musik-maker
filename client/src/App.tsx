@@ -45,6 +45,8 @@ function App() {
     setMasterReverb,
     setTrackDelaySend,
     setMasterDelay,
+    setTrackFilterSend,
+    setMasterFilter,
     activePattern,
     audioEngine,
   } = useSequencer();
@@ -91,6 +93,7 @@ function App() {
         masterVolume={state.masterVolume}
         masterReverb={state.masterReverb}
         masterDelay={state.masterDelay}
+        masterFilter={state.masterFilter}
         audioEngine={audioEngine}
         onSetVolume={setTrackVolume}
         onSetPan={setTrackPan}
@@ -102,6 +105,8 @@ function App() {
         onSetMasterReverb={setMasterReverb}
         onSetDelaySend={setTrackDelaySend}
         onSetMasterDelay={setMasterDelay}
+        onSetFilterSend={setTrackFilterSend}
+        onSetMasterFilter={setMasterFilter}
       />
 
       {activePattern && (

@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType } from '../types';
 
 class AudioEngine {
   private context: AudioContext;
@@ -24,6 +24,12 @@ class AudioEngine {
   private delayFilter: BiquadFilterNode;
   private delayReturnGain: GainNode;
   private delayBpm: number = 120;
+
+  // Filter send/return bus
+  private filterSendGains: Map<InstrumentName, GainNode> = new Map();
+  private filterBus: GainNode;
+  private filterNode: BiquadFilterNode;
+  private filterReturnGain: GainNode;
 
   constructor() {
     this.context = new AudioContext();
@@ -82,6 +88,20 @@ class AudioEngine {
     this.delayFeedback.connect(this.delayNode);
     this.delayReturnGain.connect(this.masterGain);
 
+    // Filter send/return bus
+    // Signal flow: channel send gains → filterBus → filterNode → returnGain → masterGain
+    this.filterBus = this.context.createGain();
+    this.filterNode = this.context.createBiquadFilter();
+    this.filterNode.type = 'lowpass';
+    this.filterNode.frequency.value = 2000;
+    this.filterNode.Q.value = 1;
+    this.filterReturnGain = this.context.createGain();
+    this.filterReturnGain.gain.value = 1;
+
+    this.filterBus.connect(this.filterNode);
+    this.filterNode.connect(this.filterReturnGain);
+    this.filterReturnGain.connect(this.masterGain);
+
     // Create a stereo panner + analyser per instrument channel
     const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion'];
     for (const name of instruments) {
@@ -105,10 +125,17 @@ class AudioEngine {
       panner.connect(delaySendGain);
       delaySendGain.connect(this.delayBus);
 
+      // Filter send: taps from panner output into the filter bus
+      const filterSendGain = this.context.createGain();
+      filterSendGain.gain.value = 0; // dry by default
+      panner.connect(filterSendGain);
+      filterSendGain.connect(this.filterBus);
+
       this.panners.set(name, panner);
       this.channelAnalysers.set(name, analyser);
       this.reverbSendGains.set(name, sendGain);
       this.delaySendGains.set(name, delaySendGain);
+      this.filterSendGains.set(name, filterSendGain);
     }
 
     // Pre-generate a reusable white noise buffer (2 seconds of noise)
@@ -303,6 +330,31 @@ class AudioEngine {
     }
     if (params.mix !== undefined) {
       this.delayReturnGain.gain.value = Math.max(0, Math.min(1, params.mix));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Filter controls
+  // ---------------------------------------------------------------------------
+
+  /** Set the filter send level for a channel (0–1). */
+  setChannelFilterSend(instrument: InstrumentName, value: number): void {
+    const sendGain = this.filterSendGains.get(instrument);
+    if (sendGain) {
+      sendGain.gain.value = Math.max(0, Math.min(1, value));
+    }
+  }
+
+  /** Update the master filter parameters. */
+  setFilterParams(params: Partial<FilterSettings>): void {
+    if (params.type !== undefined) {
+      this.filterNode.type = params.type as BiquadFilterType;
+    }
+    if (params.cutoff !== undefined) {
+      this.filterNode.frequency.value = Math.max(20, Math.min(20000, params.cutoff));
+    }
+    if (params.resonance !== undefined) {
+      this.filterNode.Q.value = Math.max(0.1, Math.min(25, params.resonance));
     }
   }
 

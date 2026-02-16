@@ -22,6 +22,8 @@ export interface Track {
   reverbSend: number;
   /** Delay send level: 0 (dry) to 1 (full send) */
   delaySend: number;
+  /** Filter send level: 0 (dry) to 1 (full send) */
+  filterSend: number;
 }
 
 export interface Pattern {
@@ -107,6 +109,21 @@ export interface DelaySettings {
   mix: number;
 }
 
+/** Filter type for the master filter effect */
+export type FilterType = 'lowpass' | 'highpass' | 'bandpass';
+
+/** Filter parameters for the master filter effect */
+export interface FilterSettings {
+  /** Send level: 0 (dry) to 1 (full send) */
+  send: number;
+  /** Filter type: lowpass, highpass, or bandpass */
+  type: FilterType;
+  /** Cutoff frequency in Hz (20–20000) */
+  cutoff: number;
+  /** Resonance (Q factor): 0.1–25 */
+  resonance: number;
+}
+
 export type PlaybackMode = 'pattern' | 'song';
 
 export interface SequencerState {
@@ -127,4 +144,6 @@ export interface SequencerState {
   masterReverb: ReverbSettings;
   /** Master delay effect settings */
   masterDelay: DelaySettings;
+  /** Master filter effect settings */
+  masterFilter: FilterSettings;
 }
