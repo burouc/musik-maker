@@ -1018,6 +1018,24 @@
   background: rgba(233, 69, 96, 0.5);
 }
 
+/* Note resize handles */
+.piano-roll-cell.note-edge-left {
+  cursor: ew-resize;
+}
+
+.piano-roll-cell.note-edge-right {
+  cursor: ew-resize;
+}
+
+.piano-roll-cell.resize-preview {
+  background: rgba(233, 69, 96, 0.5);
+  border-color: rgba(233, 69, 96, 0.7);
+}
+
+.piano-note-bar.resize-bar {
+  opacity: 0.7;
+}
+
 /* =========================================================================
    Responsive
    ========================================================================= */

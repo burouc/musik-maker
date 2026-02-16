@@ -592,6 +592,23 @@ function useSequencer() {
     audioEngine.current.playPianoNote(pitch, 0.5, 0.3);
   }, []);
 
+  const updatePianoNote = useCallback((noteId: string, updates: { step?: number; duration?: number }) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        return {
+          ...pattern,
+          pianoRoll: {
+            notes: pattern.pianoRoll.notes.map((n) =>
+              n.id === noteId ? { ...n, ...updates } : n,
+            ),
+          },
+        };
+      }),
+    }));
+  }, []);
+
   const clearPianoRoll = useCallback(() => {
     setState((prev) => ({
       ...prev,
@@ -725,6 +742,7 @@ function useSequencer() {
     duplicatePattern,
     addPianoNote,
     deletePianoNote,
+    updatePianoNote,
     previewPianoNote,
     clearPianoRoll,
     toggleArrangementBlock,

@@ -25,9 +25,25 @@ for (let m = MIDI_HIGH; m >= MIDI_LOW; m--) {
   KEY_RANGE.push(m);
 }
 
+/** Pixel threshold from cell edge to trigger resize */
+const RESIZE_EDGE_PX = 6;
+
 interface DragState {
   pitch: number;
   startStep: number;
+  currentStep: number;
+}
+
+interface ResizeState {
+  noteId: string;
+  pitch: number;
+  /** 'left' = dragging left edge, 'right' = dragging right edge */
+  edge: 'left' | 'right';
+  /** Original note start step */
+  origStep: number;
+  /** Original note duration */
+  origDuration: number;
+  /** Current step the mouse is over */
   currentStep: number;
 }
 
@@ -38,6 +54,7 @@ interface PianoRollProps {
   isPlaying: boolean;
   onAddNote: (pitch: number, step: number, duration: number) => void;
   onDeleteNote: (noteId: string) => void;
+  onUpdateNote: (noteId: string, updates: { step?: number; duration?: number }) => void;
   onPreviewNote: (pitch: number) => void;
 }
 
@@ -48,10 +65,13 @@ function PianoRoll({
   isPlaying,
   onAddNote,
   onDeleteNote,
+  onUpdateNote,
   onPreviewNote,
 }: PianoRollProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const [resize, setResize] = useState<ResizeState | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
 
   // Build a lookup: for each pitch, a sorted list of notes
   const notesByPitch = useRef<Map<number, PianoNote[]>>(new Map());
@@ -86,9 +106,48 @@ function PianoRoll({
     [onPreviewNote],
   );
 
+  /** Detect if mouse is near a note edge for resize */
+  function detectEdge(e: React.MouseEvent, pitch: number, step: number): { note: PianoNote; edge: 'left' | 'right' } | null {
+    const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
+    if (!coveredNote || coveredNote.duration < 1) return null;
+
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const xInCell = e.clientX - rect.left;
+    const cellWidth = rect.width;
+
+    // Left edge: only on the first step of the note
+    if (step === coveredNote.step && xInCell < RESIZE_EDGE_PX) {
+      return { note: coveredNote, edge: 'left' };
+    }
+    // Right edge: only on the last step of the note
+    const lastStep = coveredNote.step + coveredNote.duration - 1;
+    if (step === lastStep && xInCell > cellWidth - RESIZE_EDGE_PX) {
+      return { note: coveredNote, edge: 'right' };
+    }
+
+    return null;
+  }
+
   const handleCellMouseDown = useCallback(
     (pitch: number, step: number, e: React.MouseEvent) => {
       e.preventDefault();
+
+      // Check for resize edge first
+      const edgeHit = detectEdge(e, pitch, step);
+      if (edgeHit) {
+        const newResize: ResizeState = {
+          noteId: edgeHit.note.id,
+          pitch: edgeHit.note.pitch,
+          edge: edgeHit.edge,
+          origStep: edgeHit.note.step,
+          origDuration: edgeHit.note.duration,
+          currentStep: step,
+        };
+        resizeRef.current = newResize;
+        setResize(newResize);
+        return;
+      }
+
       // Check if there's an existing note covering this cell
       const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
       if (coveredNote) {
@@ -107,6 +166,15 @@ function PianoRoll({
 
   const handleCellMouseEnter = useCallback(
     (pitch: number, step: number) => {
+      // Handle resize drag
+      if (resizeRef.current) {
+        if (pitch !== resizeRef.current.pitch) return;
+        const updated = { ...resizeRef.current, currentStep: step };
+        resizeRef.current = updated;
+        setResize(updated);
+        return;
+      }
+      // Handle new-note drag
       if (!dragRef.current) return;
       // Only allow horizontal dragging on the same pitch
       if (pitch !== dragRef.current.pitch) return;
@@ -118,6 +186,30 @@ function PianoRoll({
   );
 
   const handleMouseUp = useCallback(() => {
+    // Handle resize completion
+    const r = resizeRef.current;
+    if (r) {
+      let newStep = r.origStep;
+      let newDuration = r.origDuration;
+      if (r.edge === 'right') {
+        // Right edge: new end = currentStep, keep start fixed
+        const newEnd = Math.max(r.currentStep, r.origStep);
+        newDuration = newEnd - r.origStep + 1;
+      } else {
+        // Left edge: new start = currentStep, keep end fixed
+        const origEnd = r.origStep + r.origDuration - 1;
+        newStep = Math.min(r.currentStep, origEnd);
+        newDuration = origEnd - newStep + 1;
+      }
+      if (newStep !== r.origStep || newDuration !== r.origDuration) {
+        onUpdateNote(r.noteId, { step: newStep, duration: newDuration });
+      }
+      resizeRef.current = null;
+      setResize(null);
+      return;
+    }
+
+    // Handle new-note drag completion
     const d = dragRef.current;
     if (!d) return;
     const minStep = Math.min(d.startStep, d.currentStep);
@@ -126,12 +218,12 @@ function PianoRoll({
     onAddNote(d.pitch, minStep, duration);
     dragRef.current = null;
     setDrag(null);
-  }, [onAddNote]);
+  }, [onAddNote, onUpdateNote]);
 
   // Global mouseup listener to catch releases outside the grid
   useEffect(() => {
     const onUp = () => {
-      if (dragRef.current) {
+      if (dragRef.current || resizeRef.current) {
         handleMouseUp();
       }
     };
@@ -143,6 +235,21 @@ function PianoRoll({
   const dragMin = drag ? Math.min(drag.startStep, drag.currentStep) : -1;
   const dragMax = drag ? Math.max(drag.startStep, drag.currentStep) : -1;
   const dragPitch = drag?.pitch ?? -1;
+
+  // Compute resize preview range
+  let resizePreviewStart = -1;
+  let resizePreviewEnd = -1;
+  const resizePitch = resize?.pitch ?? -1;
+  if (resize) {
+    if (resize.edge === 'right') {
+      resizePreviewStart = resize.origStep;
+      resizePreviewEnd = Math.max(resize.currentStep, resize.origStep);
+    } else {
+      const origEnd = resize.origStep + resize.origDuration - 1;
+      resizePreviewStart = Math.min(resize.currentStep, origEnd);
+      resizePreviewEnd = origEnd;
+    }
+  }
 
   return (
     <div className="piano-roll">
@@ -199,26 +306,51 @@ function PianoRoll({
                       drag && midi === dragPitch && step >= dragMin && step <= dragMax;
                     const isDragStart = isDragPreview && step === dragMin;
 
+                    // Resize preview: show the note at its new size
+                    const isResizing = resize && coveredNote && coveredNote.id === resize.noteId;
+                    const isResizePreview =
+                      resize && midi === resizePitch && step >= resizePreviewStart && step <= resizePreviewEnd;
+                    const isResizeStart = isResizePreview && step === resizePreviewStart;
+
+                    // During resize, hide the original note cells and show preview instead
+                    const hideForResize = isResizing && !isResizePreview;
+                    const showAsResizeActive = isResizePreview && !isResizing;
+
+                    // Determine if this cell is a resize handle (left or right edge of a note)
+                    const isLeftEdge = isNoteStart && isCovered;
+                    const isRightEdge = isCovered && coveredNote && step === coveredNote.step + coveredNote.duration - 1;
+
                     return (
                       <div
                         key={step}
                         className={
                           `piano-roll-cell` +
-                          (isNoteStart ? ' active note-start' : '') +
-                          (isContinuation ? ' active note-continuation' : '') +
+                          (isNoteStart && !hideForResize ? ' active note-start' : '') +
+                          (isContinuation && !hideForResize ? ' active note-continuation' : '') +
                           (isCurrent ? ' current' : '') +
                           (step % 4 === 0 ? ' beat-start' : '') +
                           (isDragPreview && !isCovered ? ' drag-preview' : '') +
-                          (isDragStart && !isCovered ? ' drag-start' : '')
+                          (isDragStart && !isCovered ? ' drag-start' : '') +
+                          (showAsResizeActive ? ' active resize-preview' : '') +
+                          (isResizeStart && showAsResizeActive ? ' note-start' : '') +
+                          (isResizePreview && isResizing ? ' resize-preview' : '') +
+                          (isLeftEdge && !resize ? ' note-edge-left' : '') +
+                          (isRightEdge && !resize ? ' note-edge-right' : '')
                         }
                         onMouseDown={(e) => handleCellMouseDown(midi, step, e)}
                         onMouseEnter={() => handleCellMouseEnter(midi, step)}
                         onMouseUp={handleMouseUp}
                       >
-                        {isNoteStart && noteStart!.duration > 1 && (
+                        {isNoteStart && noteStart!.duration > 1 && !hideForResize && (
                           <div
                             className="piano-note-bar"
                             style={{ width: `calc(${noteStart!.duration * 100}% + ${(noteStart!.duration - 1) * 2}px)` }}
+                          />
+                        )}
+                        {isResizeStart && resizePreviewEnd - resizePreviewStart >= 0 && (
+                          <div
+                            className="piano-note-bar resize-bar"
+                            style={{ width: `calc(${(resizePreviewEnd - resizePreviewStart + 1) * 100}% + ${(resizePreviewEnd - resizePreviewStart) * 2}px)` }}
                           />
                         )}
                       </div>

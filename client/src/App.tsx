@@ -28,6 +28,7 @@ function App() {
     duplicatePattern,
     addPianoNote,
     deletePianoNote,
+    updatePianoNote,
     previewPianoNote,
     toggleArrangementBlock,
     toggleArrangementTrackMute,
@@ -92,6 +93,7 @@ function App() {
           isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
           onAddNote={addPianoNote}
           onDeleteNote={deletePianoNote}
+          onUpdateNote={updatePianoNote}
           onPreviewNote={previewPianoNote}
         />
       )}
