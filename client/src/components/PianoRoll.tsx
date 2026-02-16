@@ -1,5 +1,5 @@
-import { memo, useCallback, useRef } from 'react';
-import type { PianoRollData, PianoNote } from '../types';
+import { memo, useCallback } from 'react';
+import type { PianoRollData } from '../types';
 
 /** Note names in chromatic order */
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -19,9 +19,6 @@ function isBlackKey(midi: number): boolean {
 /** Range of notes to display (C2 = 36 to B5 = 83, 4 octaves) */
 const MIDI_LOW = 36;
 const MIDI_HIGH = 83;
-const TOTAL_KEYS = MIDI_HIGH - MIDI_LOW + 1;
-const TOTAL_STEPS = 16;
-
 /** Build array of MIDI note numbers from high to low for rendering top-to-bottom */
 const KEY_RANGE: number[] = [];
 for (let m = MIDI_HIGH; m >= MIDI_LOW; m--) {
@@ -30,6 +27,7 @@ for (let m = MIDI_HIGH; m >= MIDI_LOW; m--) {
 
 interface PianoRollProps {
   pianoRoll: PianoRollData;
+  stepCount: number;
   currentStep: number;
   isPlaying: boolean;
   onToggleNote: (pitch: number, step: number) => void;
@@ -38,6 +36,7 @@ interface PianoRollProps {
 
 function PianoRoll({
   pianoRoll,
+  stepCount,
   currentStep,
   isPlaying,
   onToggleNote,
@@ -73,7 +72,7 @@ function PianoRoll({
         <div className="piano-roll-step-header">
           <div className="piano-keyboard-spacer" />
           <div className="piano-roll-step-numbers">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+            {Array.from({ length: stepCount }, (_, i) => (
               <div
                 key={i}
                 className={`piano-roll-step-num${i % 4 === 0 ? ' beat-start' : ''}${isPlaying && currentStep === i ? ' current' : ''}`}
@@ -106,7 +105,7 @@ function PianoRoll({
 
                 {/* Step grid cells */}
                 <div className="piano-roll-cells">
-                  {Array.from({ length: TOTAL_STEPS }, (_, step) => {
+                  {Array.from({ length: stepCount }, (_, step) => {
                     const active = activeNotes.has(`${midi}-${step}`);
                     const isCurrent = isPlaying && currentStep === step;
                     return (

@@ -39,23 +39,40 @@ const StepRow = React.memo<StepRowProps>(function StepRow({
 
 interface StepSequencerProps {
   tracks: Track[];
+  stepCount: number;
   currentStep: number;
   isPlaying: boolean;
   onToggleStep: (trackId: InstrumentName, stepIndex: number) => void;
+  onStepCountChange: (stepCount: number) => void;
 }
 
 const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
   tracks,
+  stepCount,
   currentStep,
   isPlaying,
   onToggleStep,
+  onStepCountChange,
 }) {
   return (
     <div className="step-sequencer">
+      <div className="step-sequencer-toolbar">
+        <label className="step-count-label">
+          Steps:
+          <input
+            type="number"
+            className="step-count-input"
+            min={1}
+            max={64}
+            value={stepCount}
+            onChange={(e) => onStepCountChange(Number(e.target.value))}
+          />
+        </label>
+      </div>
       <div className="step-header">
         <div className="track-label" />
         <div className="step-cells">
-          {Array.from({ length: 16 }, (_, i) => (
+          {Array.from({ length: stepCount }, (_, i) => (
             <div
               key={i}
               className={`step-number${i % 4 === 0 ? ' beat-start' : ''}`}

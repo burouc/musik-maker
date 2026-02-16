@@ -19,6 +19,8 @@ export interface Pattern {
   id: string;
   name: string;
   color: string;
+  /** Number of steps in this pattern (1–64, default 16) */
+  stepCount: number;
   tracks: Track[];
   pianoRoll: PianoRollData;
 }

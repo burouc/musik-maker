@@ -26,13 +26,13 @@ function App() {
     duplicatePattern,
     togglePianoNote,
     previewPianoNote,
-    clearPianoRoll,
     toggleArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
     removeArrangementTrack,
     setArrangementLength,
     setPlaybackMode,
+    setPatternStepCount,
     activePattern,
   } = useSequencer();
 
@@ -64,9 +64,11 @@ function App() {
 
       <StepSequencer
         tracks={tracks}
+        stepCount={activePattern?.stepCount ?? 16}
         currentStep={state.currentStep}
         isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
         onToggleStep={toggleStep}
+        onStepCountChange={setPatternStepCount}
       />
 
       <Mixer
@@ -80,6 +82,7 @@ function App() {
       {activePattern && (
         <PianoRoll
           pianoRoll={activePattern.pianoRoll}
+          stepCount={activePattern.stepCount}
           currentStep={state.currentStep}
           isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
           onToggleNote={togglePianoNote}

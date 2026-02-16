@@ -8,11 +8,10 @@ import type {
   PlaybackMode,
   SequencerState,
   PianoNote,
-  PianoRollData,
 } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
-const TOTAL_STEPS = 16;
+const DEFAULT_STEP_COUNT = 16;
 
 const PATTERN_COLORS = [
   '#e94560',
@@ -25,14 +24,14 @@ const PATTERN_COLORS = [
   '#f97316',
 ];
 
-function createDefaultTracks(): Track[] {
+function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'snare', name: 'Snare', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'clap', name: 'Clap', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'openhat', name: 'Open Hat', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
-    { id: 'percussion', name: 'Percussion', steps: Array(TOTAL_STEPS).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(false), volume: 0.8, muted: false, solo: false },
   ];
 }
 
@@ -41,6 +40,7 @@ function createPattern(index: number): Pattern {
     id: `pattern-${Date.now()}-${index}`,
     name: `Pattern ${index + 1}`,
     color: PATTERN_COLORS[index % PATTERN_COLORS.length],
+    stepCount: DEFAULT_STEP_COUNT,
     tracks: createDefaultTracks(),
     pianoRoll: { notes: [] },
   };
@@ -66,7 +66,7 @@ const INITIAL_STATE: SequencerState = {
   bpm: 120,
   currentStep: -1,
   isPlaying: false,
-  totalSteps: TOTAL_STEPS,
+  totalSteps: DEFAULT_STEP_COUNT,
   playbackMode: 'pattern',
   currentMeasure: -1,
 };
@@ -107,7 +107,7 @@ function useSequencer() {
             );
             if (!pattern) return prev;
 
-            const nextStep = (prev.currentStep + 1) % prev.totalSteps;
+            const nextStep = (prev.currentStep + 1) % pattern.stepCount;
             const anySoloed = pattern.tracks.some((t) => t.solo);
 
             for (const track of pattern.tracks) {
@@ -135,7 +135,12 @@ function useSequencer() {
             return { ...prev, currentStep: nextStep };
           } else {
             // --- Song mode: play through the arrangement ---
-            const nextStep = (prev.currentStep + 1) % prev.totalSteps;
+            // Use the active pattern's step count for the measure loop
+            const activePattern = current.patterns.find(
+              (p) => p.id === current.activePatternId,
+            );
+            const measureSteps = activePattern?.stepCount ?? DEFAULT_STEP_COUNT;
+            const nextStep = (prev.currentStep + 1) % measureSteps;
             let nextMeasure = prev.currentMeasure;
 
             // Advance to next measure when we wrap around to step 0
@@ -162,6 +167,9 @@ function useSequencer() {
                     (p) => p.id === block.patternId,
                   );
                   if (!pattern) continue;
+
+                  // Only play steps within this pattern's step count
+                  if (nextStep >= pattern.stepCount) continue;
 
                   const anySoloed = pattern.tracks.some((t) => t.solo);
 
@@ -272,6 +280,7 @@ function useSequencer() {
         id: `pattern-${Date.now()}-dup`,
         name: `${source.name} (copy)`,
         color: PATTERN_COLORS[prev.patterns.length % PATTERN_COLORS.length],
+        stepCount: source.stepCount,
         tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps] })),
         pianoRoll: { notes: source.pianoRoll.notes.map((n) => ({ ...n })) },
       };
@@ -407,7 +416,7 @@ function useSequencer() {
               ...pattern,
               tracks: pattern.tracks.map((track) =>
                 track.id === trackId
-                  ? { ...track, steps: Array(prev.totalSteps).fill(false) }
+                  ? { ...track, steps: Array(pattern.stepCount).fill(false) }
                   : track,
               ),
             }
@@ -428,11 +437,42 @@ function useSequencer() {
               ...pattern,
               tracks: pattern.tracks.map((track) => ({
                 ...track,
-                steps: Array(prev.totalSteps).fill(false),
+                steps: Array(pattern.stepCount).fill(false),
               })),
             }
           : pattern,
       ),
+    }));
+  }, []);
+
+  const setPatternStepCount = useCallback((stepCount: number) => {
+    const clamped = Math.max(1, Math.min(64, stepCount));
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        const oldCount = pattern.stepCount;
+        if (clamped === oldCount) return pattern;
+        return {
+          ...pattern,
+          stepCount: clamped,
+          tracks: pattern.tracks.map((track) => {
+            if (clamped > oldCount) {
+              // Extend: pad with false
+              return {
+                ...track,
+                steps: [...track.steps, ...Array(clamped - oldCount).fill(false)],
+              };
+            }
+            // Shrink: truncate
+            return { ...track, steps: track.steps.slice(0, clamped) };
+          }),
+          pianoRoll: {
+            // Remove notes beyond the new step count
+            notes: pattern.pianoRoll.notes.filter((n) => n.step < clamped),
+          },
+        };
+      }),
     }));
   }, []);
 
@@ -615,6 +655,7 @@ function useSequencer() {
     removeArrangementTrack,
     setArrangementLength,
     setPlaybackMode,
+    setPatternStepCount,
   };
 }
 
