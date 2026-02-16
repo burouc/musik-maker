@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react';
-import type { PianoRollData, PianoNote, SynthSettings, OscillatorType } from '../types';
+import type { PianoRollData, PianoNote, SynthSettings, OscillatorType, SnapResolution } from '../types';
 
 /** Note names in chromatic order */
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -27,6 +27,56 @@ for (let m = MIDI_HIGH; m >= MIDI_LOW; m--) {
 
 /** Pixel threshold from cell edge to trigger resize */
 const RESIZE_EDGE_PX = 6;
+
+/** Available snap resolutions with display labels */
+const SNAP_OPTIONS: { value: SnapResolution; label: string }[] = [
+  { value: '1/4', label: '1/4' },
+  { value: '1/8', label: '1/8' },
+  { value: '1/16', label: '1/16' },
+  { value: '1/32', label: '1/32' },
+  { value: '1/4T', label: '1/4T' },
+  { value: '1/8T', label: '1/8T' },
+  { value: '1/16T', label: '1/16T' },
+];
+
+/**
+ * Get the snap grid size in steps for a given resolution.
+ * Steps are 1/16th notes (16 steps = 1 bar of 4/4).
+ */
+function snapStepSize(resolution: SnapResolution): number {
+  switch (resolution) {
+    case '1/4':  return 4;
+    case '1/8':  return 2;
+    case '1/16': return 1;
+    case '1/32': return 0.5;
+    case '1/4T': return 4 / 3;   // triplet quarter = 2.667 steps
+    case '1/8T': return 2 / 3;   // triplet eighth = 1.333 steps
+    case '1/16T': return 1 / 3;  // triplet sixteenth = 0.333 steps
+  }
+}
+
+/** Snap a step value to the nearest grid position */
+function snapToGrid(step: number, resolution: SnapResolution): number {
+  const size = snapStepSize(resolution);
+  return Math.round(step / size) * size;
+}
+
+/** Snap a step value down to the nearest grid position (floor) */
+function snapFloor(step: number, resolution: SnapResolution): number {
+  const size = snapStepSize(resolution);
+  return Math.floor(step / size) * size;
+}
+
+/** Snap a step value up to the nearest grid position (ceil) */
+function snapCeil(step: number, resolution: SnapResolution): number {
+  const size = snapStepSize(resolution);
+  return Math.ceil(step / size) * size;
+}
+
+/** Get the minimum duration for a given snap resolution (at least 1 grid unit) */
+function snapMinDuration(resolution: SnapResolution): number {
+  return Math.max(1, snapStepSize(resolution));
+}
 
 interface DragState {
   pitch: number;
@@ -120,6 +170,9 @@ function PianoRoll({
   /** Clipboard: stores copied notes with positions relative to the selection origin */
   const clipboardRef = useRef<Omit<PianoNote, 'id'>[]>([]);
   const velocityLaneRef = useRef<HTMLDivElement>(null);
+  /** Snap-to-grid resolution */
+  const [snapResolution, setSnapResolution] = useState<SnapResolution>('1/16');
+  const [snapEnabled, setSnapEnabled] = useState(true);
 
   // Build a lookup: for each pitch, a sorted list of notes
   const notesByPitch = useRef<Map<number, PianoNote[]>>(new Map());
@@ -379,8 +432,13 @@ function PianoRoll({
     // Handle move completion
     const m = moveRef.current;
     if (m) {
-      const stepDelta = m.currentStep - m.startStep;
+      let stepDelta = m.currentStep - m.startStep;
       const pitchDelta = m.currentPitch - m.startPitch;
+      // Snap the step delta to the grid
+      if (snapEnabled && stepDelta !== 0) {
+        const size = snapStepSize(snapResolution);
+        stepDelta = Math.round(stepDelta / size) * size;
+      }
       if (stepDelta !== 0 || pitchDelta !== 0) {
         onMoveNotes(selectedNoteIds, stepDelta, pitchDelta);
       }
@@ -396,16 +454,28 @@ function PianoRoll({
       let newDuration = r.origDuration;
       if (r.edge === 'right') {
         // Right edge: new end = currentStep, keep start fixed
-        const newEnd = Math.max(r.currentStep, r.origStep);
+        let newEnd = Math.max(r.currentStep, r.origStep);
+        if (snapEnabled) {
+          // Snap the end position to grid (snap the cell after the end)
+          newEnd = Math.max(r.origStep, Math.round(snapCeil(newEnd + 1, snapResolution)) - 1);
+        }
         newDuration = newEnd - r.origStep + 1;
       } else {
         // Left edge: new start = currentStep, keep end fixed
         const origEnd = r.origStep + r.origDuration - 1;
         newStep = Math.min(r.currentStep, origEnd);
+        if (snapEnabled) {
+          newStep = Math.min(origEnd, Math.round(snapFloor(newStep, snapResolution)));
+        }
         newDuration = origEnd - newStep + 1;
       }
+      // Ensure minimum duration
+      if (snapEnabled) {
+        newDuration = Math.max(newDuration, Math.round(snapMinDuration(snapResolution)));
+      }
+      if (newDuration < 1) newDuration = 1;
       if (newStep !== r.origStep || newDuration !== r.origDuration) {
-        onUpdateNote(r.noteId, { step: newStep, duration: newDuration });
+        onUpdateNote(r.noteId, { step: Math.round(newStep), duration: Math.round(newDuration) });
       }
       resizeRef.current = null;
       setResize(null);
@@ -415,13 +485,19 @@ function PianoRoll({
     // Handle new-note drag completion
     const d = dragRef.current;
     if (!d) return;
-    const minStep = Math.min(d.startStep, d.currentStep);
-    const maxStep = Math.max(d.startStep, d.currentStep);
+    let minStep = Math.min(d.startStep, d.currentStep);
+    let maxStep = Math.max(d.startStep, d.currentStep);
+    if (snapEnabled) {
+      minStep = Math.round(snapFloor(minStep, snapResolution));
+      maxStep = Math.round(snapCeil(maxStep + 1, snapResolution)) - 1;
+      // Ensure at least one grid unit
+      if (maxStep < minStep) maxStep = minStep + Math.round(snapMinDuration(snapResolution)) - 1;
+    }
     const duration = maxStep - minStep + 1;
-    onAddNote(d.pitch, minStep, duration);
+    onAddNote(d.pitch, Math.round(minStep), Math.round(duration));
     dragRef.current = null;
     setDrag(null);
-  }, [onAddNote, onUpdateNote, onMoveNotes, selectedNoteIds]);
+  }, [onAddNote, onUpdateNote, onMoveNotes, selectedNoteIds, snapEnabled, snapResolution]);
 
   // Global mouseup listener to catch releases outside the grid
   useEffect(() => {
@@ -530,14 +606,15 @@ function PianoRoll({
       // Arrow keys: move selected notes
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        const stepDelta = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+        const snapSize = snapEnabled ? Math.max(1, Math.round(snapStepSize(snapResolution))) : 1;
+        const stepDelta = e.key === 'ArrowLeft' ? -snapSize : e.key === 'ArrowRight' ? snapSize : 0;
         const pitchDelta = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0;
         onMoveNotes(selectedNoteIds, stepDelta, pitchDelta);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedNoteIds, onDeleteNote, onMoveNotes, onPasteNotes, pianoRoll.notes]);
+  }, [selectedNoteIds, onDeleteNote, onMoveNotes, onPasteNotes, pianoRoll.notes, snapEnabled, snapResolution]);
 
   // Clear selected notes that no longer exist
   useEffect(() => {
@@ -604,6 +681,15 @@ function PianoRoll({
   // Pre-compute which note IDs are in the active box selection (for live preview)
   const boxPreviewIds = boxSelect ? getNotesInBox(boxSelect) : null;
 
+  // Pre-compute snap grid line positions for visual feedback
+  const snapSize = snapEnabled ? snapStepSize(snapResolution) : 1;
+  const isSnapLine = useCallback((step: number): boolean => {
+    if (!snapEnabled || snapSize <= 1) return false;
+    // A step is on the snap grid if it's within rounding distance of a grid position
+    const remainder = step % snapSize;
+    return remainder < 0.001 || (snapSize - remainder) < 0.001;
+  }, [snapEnabled, snapSize]);
+
   /** Velocity lane: compute velocity from mouse Y position relative to the bar container */
   const velocityFromMouseY = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -650,7 +736,31 @@ function PianoRoll({
   return (
     <div className="piano-roll">
       <div className="piano-roll-header">
-        <div className="piano-roll-title">Piano Roll</div>
+        <div className="piano-roll-title-row">
+          <div className="piano-roll-title">Piano Roll</div>
+          <div className="snap-controls">
+            <button
+              className={`snap-toggle${snapEnabled ? ' active' : ''}`}
+              onClick={() => setSnapEnabled((v) => !v)}
+              title={snapEnabled ? 'Snap enabled (click to disable)' : 'Snap disabled (click to enable)'}
+            >
+              Snap
+            </button>
+            <select
+              className="snap-select"
+              value={snapResolution}
+              onChange={(e) => setSnapResolution(e.target.value as SnapResolution)}
+              disabled={!snapEnabled}
+              title="Grid resolution"
+            >
+              {SNAP_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <div className="synth-controls">
           <div className="synth-control-group">
@@ -973,7 +1083,7 @@ function PianoRoll({
             {Array.from({ length: stepCount }, (_, i) => (
               <div
                 key={i}
-                className={`piano-roll-step-num${i % 4 === 0 ? ' beat-start' : ''}${isPlaying && currentStep === i ? ' current' : ''}`}
+                className={`piano-roll-step-num${i % 4 === 0 ? ' beat-start' : ''}${isSnapLine(i) && i % 4 !== 0 ? ' snap-line' : ''}${isPlaying && currentStep === i ? ' current' : ''}`}
               >
                 {i + 1}
               </div>
@@ -1056,6 +1166,7 @@ function PianoRoll({
                           (isMovePreviewStart ? ' note-start' : '') +
                           (isCurrent ? ' current' : '') +
                           (step % 4 === 0 ? ' beat-start' : '') +
+                          (isSnapLine(step) && step % 4 !== 0 ? ' snap-line' : '') +
                           (isDragPreview && !isCovered ? ' drag-preview' : '') +
                           (isDragStart && !isCovered ? ' drag-start' : '') +
                           (showAsResizeActive ? ' active resize-preview' : '') +

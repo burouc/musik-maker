@@ -55,6 +55,9 @@ export interface ArrangementTrack {
   muted: boolean;
 }
 
+/** Snap-to-grid resolution for the piano roll */
+export type SnapResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/4T' | '1/8T' | '1/16T';
+
 /** Piano-roll note names (sharps only, no enharmonic flats) */
 export type NoteName =
   | 'C'

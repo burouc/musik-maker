@@ -1780,12 +1780,69 @@
   margin-bottom: 10px;
 }
 
+.piano-roll-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .piano-roll-title {
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
   color: var(--text-secondary);
+}
+
+.snap-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.snap-toggle {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.snap-toggle:hover {
+  border-color: var(--text-secondary);
+}
+
+.snap-toggle.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.snap-select {
+  padding: 3px 6px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  outline: none;
+}
+
+.snap-select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.snap-select:focus {
+  border-color: var(--accent);
 }
 
 .piano-roll-body {
@@ -1960,6 +2017,15 @@
 
 .piano-roll-cell.beat-start {
   margin-left: 4px;
+}
+
+.piano-roll-cell.snap-line {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.piano-roll-step-num.snap-line {
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 
 .piano-roll-step-num.beat-start {

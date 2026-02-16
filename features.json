@@ -112,7 +112,7 @@
           "id": "pr-08",
           "priority": "P1",
           "title": "Snap-to-grid with configurable grid resolution (1/4, 1/8, 1/16, 1/32, triplets)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "pr-09",
