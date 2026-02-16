@@ -134,7 +134,7 @@ Features are grouped by category. Each item is marked with a priority:
 ### 9. Transport / Playback
 
 - [ ] **[P0]** Time position display (bars:beats:ticks and mm:ss)
-- [ ] **[P0]** Click/metronome toggle
+- [x] **[P0]** Click/metronome toggle
 - [ ] **[P1]** Tap tempo
 - [ ] **[P1]** Count-in before recording
 - [ ] **[P1]** Song position scrubbing (click on timeline to jump)
