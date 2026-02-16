@@ -47,6 +47,7 @@ function App() {
     setMasterDelay,
     setTrackFilterSend,
     setMasterFilter,
+    setSynthSettings,
     activePattern,
     audioEngine,
   } = useSequencer();
@@ -115,12 +116,14 @@ function App() {
           stepCount={activePattern.stepCount}
           currentStep={state.currentStep}
           isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
+          synthSettings={activePattern.synthSettings}
           onAddNote={addPianoNote}
           onDeleteNote={deletePianoNote}
           onUpdateNote={updatePianoNote}
           onPreviewNote={previewPianoNote}
           onMoveNotes={movePianoNotes}
           onPasteNotes={pastePianoNotes}
+          onSynthSettingsChange={setSynthSettings}
         />
       )}
 

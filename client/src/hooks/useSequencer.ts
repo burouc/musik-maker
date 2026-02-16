@@ -11,6 +11,7 @@ import type {
   ReverbSettings,
   DelaySettings,
   FilterSettings,
+  SynthSettings,
 } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
@@ -28,6 +29,15 @@ const PATTERN_COLORS = [
 ];
 
 const DEFAULT_VELOCITY = 0.8;
+
+const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
+  oscType: 'sawtooth',
+  osc2Type: 'sawtooth',
+  osc2Detune: 7,
+  osc2Mix: 0.5,
+  filterCutoff: 8000,
+  filterResonance: 1,
+};
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
@@ -48,6 +58,7 @@ function createPattern(index: number): Pattern {
     stepCount: DEFAULT_STEP_COUNT,
     tracks: createDefaultTracks(),
     pianoRoll: { notes: [] },
+    synthSettings: { ...DEFAULT_SYNTH_SETTINGS },
   };
 }
 
@@ -139,6 +150,7 @@ function useSequencer() {
                   note.pitch,
                   note.velocity,
                   durationSec,
+                  pattern.synthSettings,
                 );
               }
             }
@@ -204,6 +216,7 @@ function useSequencer() {
                         note.pitch,
                         note.velocity,
                         durationSec,
+                        pattern.synthSettings,
                       );
                     }
                   }
@@ -296,6 +309,7 @@ function useSequencer() {
         stepCount: source.stepCount,
         tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches] })),
         pianoRoll: { notes: source.pianoRoll.notes.map((n) => ({ ...n })) },
+        synthSettings: { ...source.synthSettings },
       };
       return {
         ...prev,
@@ -620,7 +634,10 @@ function useSequencer() {
   }, []);
 
   const previewPianoNote = useCallback((pitch: number) => {
-    audioEngine.current.playPianoNote(pitch, 0.5, 0.3);
+    const pattern = stateRef.current.patterns.find(
+      (p) => p.id === stateRef.current.activePatternId,
+    );
+    audioEngine.current.playPianoNote(pitch, 0.5, 0.3, pattern?.synthSettings);
   }, []);
 
   const updatePianoNote = useCallback((noteId: string, updates: { step?: number; duration?: number }) => {
@@ -894,6 +911,17 @@ function useSequencer() {
     }));
   }, []);
 
+  const setSynthSettings = useCallback((params: Partial<SynthSettings>) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? { ...pattern, synthSettings: { ...pattern.synthSettings, ...params } }
+          : pattern,
+      ),
+    }));
+  }, []);
+
   // Derive active pattern tracks for component consumption
   const activePattern = getActivePattern(state);
   const tracks = activePattern?.tracks ?? [];
@@ -940,6 +968,7 @@ function useSequencer() {
     setMasterDelay,
     setTrackFilterSend,
     setMasterFilter,
+    setSynthSettings,
   };
 }
 

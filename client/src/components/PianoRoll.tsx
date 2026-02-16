@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react';
-import type { PianoRollData, PianoNote } from '../types';
+import type { PianoRollData, PianoNote, SynthSettings, OscillatorType } from '../types';
 
 /** Note names in chromatic order */
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -67,17 +67,29 @@ interface MoveState {
   currentStep: number;
 }
 
+/** Display labels for oscillator types */
+const OSC_LABELS: Record<OscillatorType, string> = {
+  sine: 'Sine',
+  sawtooth: 'Saw',
+  square: 'Square',
+  triangle: 'Tri',
+};
+
+const OSC_TYPES: OscillatorType[] = ['sine', 'sawtooth', 'square', 'triangle'];
+
 interface PianoRollProps {
   pianoRoll: PianoRollData;
   stepCount: number;
   currentStep: number;
   isPlaying: boolean;
+  synthSettings: SynthSettings;
   onAddNote: (pitch: number, step: number, duration: number) => void;
   onDeleteNote: (noteId: string) => void;
   onUpdateNote: (noteId: string, updates: { step?: number; duration?: number }) => void;
   onPreviewNote: (pitch: number) => void;
   onMoveNotes: (noteIds: Set<string>, stepDelta: number, pitchDelta: number) => void;
   onPasteNotes: (notes: Omit<PianoNote, 'id'>[]) => void;
+  onSynthSettingsChange: (params: Partial<SynthSettings>) => void;
 }
 
 function PianoRoll({
@@ -85,12 +97,14 @@ function PianoRoll({
   stepCount,
   currentStep,
   isPlaying,
+  synthSettings,
   onAddNote,
   onDeleteNote,
   onUpdateNote,
   onPreviewNote,
   onMoveNotes,
   onPasteNotes,
+  onSynthSettingsChange,
 }: PianoRollProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -582,6 +596,97 @@ function PianoRoll({
     <div className="piano-roll">
       <div className="piano-roll-header">
         <div className="piano-roll-title">Piano Roll</div>
+
+        <div className="synth-controls">
+          <div className="synth-control-group">
+            <label className="synth-label">OSC 1</label>
+            <div className="synth-osc-buttons">
+              {OSC_TYPES.map((t) => (
+                <button
+                  key={t}
+                  className={`synth-osc-btn${synthSettings.oscType === t ? ' active' : ''}`}
+                  onClick={() => onSynthSettingsChange({ oscType: t })}
+                  title={OSC_LABELS[t]}
+                >
+                  {OSC_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">OSC 2</label>
+            <div className="synth-osc-buttons">
+              {OSC_TYPES.map((t) => (
+                <button
+                  key={t}
+                  className={`synth-osc-btn${synthSettings.osc2Type === t ? ' active' : ''}`}
+                  onClick={() => onSynthSettingsChange({ osc2Type: t })}
+                  title={OSC_LABELS[t]}
+                >
+                  {OSC_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Detune</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={synthSettings.osc2Detune}
+              onChange={(e) => onSynthSettingsChange({ osc2Detune: Number(e.target.value) })}
+              title={`${synthSettings.osc2Detune} cents`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Mix</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={Math.round(synthSettings.osc2Mix * 100)}
+              onChange={(e) => onSynthSettingsChange({ osc2Mix: Number(e.target.value) / 100 })}
+              title={`${Math.round(synthSettings.osc2Mix * 100)}%`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Cutoff</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={Math.round(Math.log(synthSettings.filterCutoff / 20) / Math.log(20000 / 20) * 100)}
+              onChange={(e) => {
+                const normalized = Number(e.target.value) / 100;
+                const freq = 20 * Math.pow(20000 / 20, normalized);
+                onSynthSettingsChange({ filterCutoff: Math.round(freq) });
+              }}
+              title={`${synthSettings.filterCutoff} Hz`}
+            />
+          </div>
+
+          <div className="synth-control-group">
+            <label className="synth-label">Reso</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={250}
+              value={Math.round(synthSettings.filterResonance * 10)}
+              onChange={(e) => onSynthSettingsChange({ filterResonance: Number(e.target.value) / 10 })}
+              title={`Q: ${synthSettings.filterResonance.toFixed(1)}`}
+            />
+          </div>
+        </div>
+
         {selectedNoteIds.size > 0 && (
           <div className="piano-roll-selection-count">
             {selectedNoteIds.size} selected

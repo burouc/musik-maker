@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, SynthSettings, OscillatorType } from '../types';
 
 class AudioEngine {
   private context: AudioContext;
@@ -155,34 +155,51 @@ class AudioEngine {
   }
 
   /**
-   * Play a pitched piano note using a simple subtractive synth.
+   * Play a pitched piano note using a polyphonic subtractive synth.
    * @param midiNote  MIDI note number (60 = C4)
    * @param volume    0–1
    * @param duration  Duration in seconds
+   * @param settings  Optional synth voice settings (oscillator types, detune, filter)
    */
   async playPianoNote(
     midiNote: number,
     volume: number,
     duration: number = 0.2,
+    settings?: SynthSettings,
   ): Promise<void> {
     await this.resume();
     const now = this.context.currentTime;
     const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
 
-    // Two detuned saw oscillators for a richer tone
+    const osc1Type: OscillatorType = settings?.oscType ?? 'sawtooth';
+    const osc2Type: OscillatorType = settings?.osc2Type ?? 'sawtooth';
+    const detuneCents = settings?.osc2Detune ?? 7;
+    const osc2Mix = settings?.osc2Mix ?? 0.5;
+    const cutoff = settings?.filterCutoff ?? Math.min(freq * 4, 12000);
+    const resonance = settings?.filterResonance ?? 1;
+
+    // Oscillator 1
     const osc1 = this.context.createOscillator();
-    osc1.type = 'sawtooth';
+    osc1.type = osc1Type;
     osc1.frequency.setValueAtTime(freq, now);
 
+    // Oscillator 2 (detuned)
     const osc2 = this.context.createOscillator();
-    osc2.type = 'sawtooth';
-    osc2.frequency.setValueAtTime(freq * 1.003, now); // slight detune
+    osc2.type = osc2Type;
+    osc2.frequency.setValueAtTime(freq, now);
+    osc2.detune.setValueAtTime(detuneCents, now);
 
-    // Low-pass filter for warmth
+    // Oscillator mix gains
+    const osc1Gain = this.context.createGain();
+    osc1Gain.gain.value = 1 - osc2Mix;
+    const osc2Gain = this.context.createGain();
+    osc2Gain.gain.value = osc2Mix;
+
+    // Low-pass filter (subtractive)
     const filter = this.context.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(Math.min(freq * 4, 12000), now);
-    filter.Q.setValueAtTime(1, now);
+    filter.frequency.setValueAtTime(cutoff, now);
+    filter.Q.setValueAtTime(resonance, now);
 
     // ADSR-ish envelope
     const gain = this.context.createGain();
@@ -196,8 +213,10 @@ class AudioEngine {
     gain.gain.setValueAtTime(sustain, now + duration - release);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
-    osc1.connect(filter);
-    osc2.connect(filter);
+    osc1.connect(osc1Gain);
+    osc2.connect(osc2Gain);
+    osc1Gain.connect(filter);
+    osc2Gain.connect(filter);
     filter.connect(gain);
     gain.connect(this.masterGain);
 

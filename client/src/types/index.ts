@@ -34,6 +34,8 @@ export interface Pattern {
   stepCount: number;
   tracks: Track[];
   pianoRoll: PianoRollData;
+  /** Synth voice settings for this pattern's piano roll */
+  synthSettings: SynthSettings;
 }
 
 export interface ArrangementBlock {
@@ -122,6 +124,25 @@ export interface FilterSettings {
   cutoff: number;
   /** Resonance (Q factor): 0.1–25 */
   resonance: number;
+}
+
+/** Oscillator waveform type for the synth engine */
+export type OscillatorType = 'sine' | 'sawtooth' | 'square' | 'triangle';
+
+/** Synth settings stored per pattern (controls the piano roll synth voice) */
+export interface SynthSettings {
+  /** Primary oscillator waveform */
+  oscType: OscillatorType;
+  /** Secondary oscillator waveform */
+  osc2Type: OscillatorType;
+  /** Detune amount for oscillator 2 in cents (0–100) */
+  osc2Detune: number;
+  /** Mix balance between osc1 and osc2: 0 = osc1 only, 1 = osc2 only */
+  osc2Mix: number;
+  /** Filter cutoff frequency in Hz (20–20000) */
+  filterCutoff: number;
+  /** Filter resonance (Q factor): 0.1–25 */
+  filterResonance: number;
 }
 
 export type PlaybackMode = 'pattern' | 'song';

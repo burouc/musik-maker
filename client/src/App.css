@@ -1332,6 +1332,63 @@
   border-color: rgba(100, 149, 237, 0.5);
 }
 
+/* Synth controls in piano roll header */
+.synth-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.synth-control-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.synth-label {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  min-width: 32px;
+}
+
+.synth-osc-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.synth-osc-btn {
+  font-size: 0.6rem;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.synth-osc-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.synth-osc-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.synth-slider {
+  width: 60px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
 /* Selection count indicator in header */
 .piano-roll-selection-count {
   font-size: 0.7rem;

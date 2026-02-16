@@ -298,7 +298,7 @@
           "id": "sy-01",
           "priority": "P0",
           "title": "Polyphonic subtractive synth with oscillator selection (sine, saw, square, triangle)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "sy-02",
