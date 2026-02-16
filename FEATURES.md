@@ -108,7 +108,7 @@ Features are grouped by category. Each item is marked with a priority:
 
 ### 7. Arrangement / Playlist
 
-- [ ] **[P0]** Drag patterns onto the arrangement timeline
+- [x] **[P0]** Drag patterns onto the arrangement timeline
 - [ ] **[P0]** Resize pattern clips on the timeline
 - [ ] **[P0]** Move clips freely across tracks and time positions
 - [ ] **[P0]** Loop markers (set start/end loop points)
