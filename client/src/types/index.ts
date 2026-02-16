@@ -11,6 +11,8 @@ export interface Track {
   name: string;
   /** Per-step velocity: 0 = off, 0.01–1.0 = on with that velocity */
   steps: number[];
+  /** Per-step pitch offset in semitones (−12 to +12, default 0) */
+  pitches: number[];
   volume: number;
   muted: boolean;
   solo: boolean;

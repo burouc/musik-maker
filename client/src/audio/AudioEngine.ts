@@ -80,27 +80,27 @@ class AudioEngine {
     osc2.stop(now + duration + 0.01);
   }
 
-  async playSound(instrument: InstrumentName, volume: number): Promise<void> {
+  async playSound(instrument: InstrumentName, volume: number, pitchOffset: number = 0): Promise<void> {
     await this.resume();
 
     switch (instrument) {
       case 'kick':
-        this.playKick(volume);
+        this.playKick(volume, pitchOffset);
         break;
       case 'snare':
-        this.playSnare(volume);
+        this.playSnare(volume, pitchOffset);
         break;
       case 'hihat':
-        this.playHihat(volume);
+        this.playHihat(volume, pitchOffset);
         break;
       case 'clap':
-        this.playClap(volume);
+        this.playClap(volume, pitchOffset);
         break;
       case 'openhat':
-        this.playOpenHat(volume);
+        this.playOpenHat(volume, pitchOffset);
         break;
       case 'percussion':
-        this.playPercussion(volume);
+        this.playPercussion(volume, pitchOffset);
         break;
     }
   }
@@ -117,14 +117,20 @@ class AudioEngine {
   // Private synthesis methods
   // ---------------------------------------------------------------------------
 
-  private playKick(volume: number): void {
+  /** Convert a semitone offset to a playback rate multiplier. */
+  private pitchRatio(semitones: number): number {
+    return Math.pow(2, semitones / 12);
+  }
+
+  private playKick(volume: number, pitchOffset: number = 0): void {
     const now = this.context.currentTime;
+    const ratio = this.pitchRatio(pitchOffset);
 
     // Oscillator: sine wave with pitch sweep 150Hz -> 40Hz over 0.15s
     const osc = this.context.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+    osc.frequency.setValueAtTime(150 * ratio, now);
+    osc.frequency.exponentialRampToValueAtTime(40 * ratio, now + 0.15);
 
     // Gain envelope: 0.7 -> 0 over 0.3s
     const gain = this.context.createGain();
@@ -138,13 +144,14 @@ class AudioEngine {
     osc.stop(now + 0.3);
   }
 
-  private playSnare(volume: number): void {
+  private playSnare(volume: number, pitchOffset: number = 0): void {
     const now = this.context.currentTime;
+    const ratio = this.pitchRatio(pitchOffset);
 
     // --- Tonal component: triangle wave at 200Hz with quick decay ---
     const osc = this.context.createOscillator();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.setValueAtTime(200 * ratio, now);
 
     const oscGain = this.context.createGain();
     oscGain.gain.setValueAtTime(0.5 * volume, now);
@@ -161,7 +168,7 @@ class AudioEngine {
 
     const bandpass = this.context.createBiquadFilter();
     bandpass.type = 'bandpass';
-    bandpass.frequency.setValueAtTime(5000, now);
+    bandpass.frequency.setValueAtTime(5000 * ratio, now);
     bandpass.Q.setValueAtTime(1, now);
 
     const noiseGain = this.context.createGain();
@@ -176,14 +183,15 @@ class AudioEngine {
     noise.stop(now + 0.15);
   }
 
-  private playHihat(volume: number): void {
+  private playHihat(volume: number, pitchOffset: number = 0): void {
     const now = this.context.currentTime;
+    const ratio = this.pitchRatio(pitchOffset);
 
     const noise = this.createNoiseSource();
 
     const highpass = this.context.createBiquadFilter();
     highpass.type = 'highpass';
-    highpass.frequency.setValueAtTime(7000, now);
+    highpass.frequency.setValueAtTime(7000 * ratio, now);
 
     const gain = this.context.createGain();
     gain.gain.setValueAtTime(0.3 * volume, now);
@@ -197,14 +205,15 @@ class AudioEngine {
     noise.stop(now + 0.05);
   }
 
-  private playClap(volume: number): void {
+  private playClap(volume: number, pitchOffset: number = 0): void {
     const now = this.context.currentTime;
+    const ratio = this.pitchRatio(pitchOffset);
 
     const noise = this.createNoiseSource();
 
     const bandpass = this.context.createBiquadFilter();
     bandpass.type = 'bandpass';
-    bandpass.frequency.setValueAtTime(1500, now);
+    bandpass.frequency.setValueAtTime(1500 * ratio, now);
     bandpass.Q.setValueAtTime(0.8, now);
 
     const gain = this.context.createGain();
@@ -233,14 +242,15 @@ class AudioEngine {
     noise.stop(decayStart + 0.15);
   }
 
-  private playOpenHat(volume: number): void {
+  private playOpenHat(volume: number, pitchOffset: number = 0): void {
     const now = this.context.currentTime;
+    const ratio = this.pitchRatio(pitchOffset);
 
     const noise = this.createNoiseSource();
 
     const highpass = this.context.createBiquadFilter();
     highpass.type = 'highpass';
-    highpass.frequency.setValueAtTime(6000, now);
+    highpass.frequency.setValueAtTime(6000 * ratio, now);
 
     const gain = this.context.createGain();
     gain.gain.setValueAtTime(0.25 * volume, now);
@@ -254,13 +264,14 @@ class AudioEngine {
     noise.stop(now + 0.3);
   }
 
-  private playPercussion(volume: number): void {
+  private playPercussion(volume: number, pitchOffset: number = 0): void {
     const now = this.context.currentTime;
+    const ratio = this.pitchRatio(pitchOffset);
 
     const osc = this.context.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(400, now + 0.08);
+    osc.frequency.setValueAtTime(800 * ratio, now);
+    osc.frequency.exponentialRampToValueAtTime(400 * ratio, now + 0.08);
 
     const gain = this.context.createGain();
     gain.gain.setValueAtTime(0.5 * volume, now);
