@@ -718,7 +718,7 @@
           "id": "ui-03",
           "priority": "P0",
           "title": "Keyboard shortcuts (space=play/stop, ctrl+z=undo, ctrl+s=save, etc.)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "ui-04",

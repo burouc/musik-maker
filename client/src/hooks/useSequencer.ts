@@ -122,16 +122,53 @@ const INITIAL_STATE: SequencerState = {
   metronomeEnabled: false,
 };
 
+const MAX_UNDO_HISTORY = 50;
+
 function useSequencer() {
   const [state, setState] = useState<SequencerState>(INITIAL_STATE);
 
   const audioEngine = useRef<AudioEngine>(new AudioEngine());
   const timerRef = useRef<number | null>(null);
   const stateRef = useRef<SequencerState>(state);
+  const undoStack = useRef<SequencerState[]>([]);
+  const redoStack = useRef<SequencerState[]>([]);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Push current state onto undo stack before a mutation
+  const pushUndo = useCallback(() => {
+    undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_HISTORY - 1)), stateRef.current];
+    redoStack.current = [];
+  }, []);
+
+  const undo = useCallback(() => {
+    if (undoStack.current.length === 0) return;
+    const prev = undoStack.current[undoStack.current.length - 1];
+    undoStack.current = undoStack.current.slice(0, -1);
+    redoStack.current = [...redoStack.current, stateRef.current];
+    // Restore state but keep playback-related fields from current state
+    setState((cur) => ({
+      ...prev,
+      isPlaying: cur.isPlaying,
+      currentStep: cur.currentStep,
+      currentMeasure: cur.currentMeasure,
+    }));
+  }, []);
+
+  const redo = useCallback(() => {
+    if (redoStack.current.length === 0) return;
+    const next = redoStack.current[redoStack.current.length - 1];
+    redoStack.current = redoStack.current.slice(0, -1);
+    undoStack.current = [...undoStack.current, stateRef.current];
+    setState((cur) => ({
+      ...next,
+      isPlaying: cur.isPlaying,
+      currentStep: cur.currentStep,
+      currentMeasure: cur.currentMeasure,
+    }));
+  }, []);
 
   // Helper: interpolate automation value at a given position
   const getAutomationValue = useCallback(
@@ -464,6 +501,7 @@ function useSequencer() {
   // -----------------------------------------------------------------------
 
   const addPattern = useCallback(() => {
+    pushUndo();
     setState((prev) => {
       const newPattern = createPattern(prev.patterns.length);
       return {
@@ -472,13 +510,14 @@ function useSequencer() {
         activePatternId: newPattern.id,
       };
     });
-  }, []);
+  }, [pushUndo]);
 
   const selectPattern = useCallback((patternId: string) => {
     setState((prev) => ({ ...prev, activePatternId: patternId }));
   }, []);
 
   const deletePattern = useCallback((patternId: string) => {
+    pushUndo();
     setState((prev) => {
       if (prev.patterns.length <= 1) return prev;
       const filtered = prev.patterns.filter((p) => p.id !== patternId);
@@ -498,7 +537,7 @@ function useSequencer() {
         arrangement: updatedArrangement,
       };
     });
-  }, []);
+  }, [pushUndo]);
 
   const renamePattern = useCallback((patternId: string, name: string) => {
     setState((prev) => ({
@@ -510,6 +549,7 @@ function useSequencer() {
   }, []);
 
   const duplicatePattern = useCallback((patternId: string) => {
+    pushUndo();
     setState((prev) => {
       const source = prev.patterns.find((p) => p.id === patternId);
       if (!source) return prev;
@@ -530,7 +570,7 @@ function useSequencer() {
         activePatternId: newPattern.id,
       };
     });
-  }, []);
+  }, [pushUndo]);
 
   // -----------------------------------------------------------------------
   // Track step actions (operate on active pattern)
@@ -538,6 +578,7 @@ function useSequencer() {
 
   const toggleStep = useCallback(
     (trackId: InstrumentName, stepIndex: number) => {
+      pushUndo();
       setState((prev) => ({
         ...prev,
         patterns: prev.patterns.map((pattern) =>
@@ -559,11 +600,12 @@ function useSequencer() {
         ),
       }));
     },
-    [],
+    [pushUndo],
   );
 
   const setStepVelocity = useCallback(
     (trackId: InstrumentName, stepIndex: number, velocity: number) => {
+      pushUndo();
       const clamped = Math.max(0, Math.min(1, velocity));
       setState((prev) => ({
         ...prev,
@@ -586,11 +628,12 @@ function useSequencer() {
         ),
       }));
     },
-    [],
+    [pushUndo],
   );
 
   const setStepPitch = useCallback(
     (trackId: InstrumentName, stepIndex: number, pitch: number) => {
+      pushUndo();
       const clamped = Math.round(Math.max(-12, Math.min(12, pitch)));
       setState((prev) => ({
         ...prev,
@@ -613,7 +656,7 @@ function useSequencer() {
         ),
       }));
     },
-    [],
+    [pushUndo],
   );
 
   const togglePlay = useCallback(() => {
@@ -733,6 +776,7 @@ function useSequencer() {
   }, []);
 
   const clearTrack = useCallback((trackId: InstrumentName) => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) =>
@@ -748,9 +792,10 @@ function useSequencer() {
           : pattern,
       ),
     }));
-  }, []);
+  }, [pushUndo]);
 
   const clearAll = useCallback(() => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       isPlaying: false,
@@ -769,9 +814,10 @@ function useSequencer() {
           : pattern,
       ),
     }));
-  }, []);
+  }, [pushUndo]);
 
   const setPatternStepCount = useCallback((stepCount: number) => {
+    pushUndo();
     const clamped = Math.max(1, Math.min(64, stepCount));
     setState((prev) => ({
       ...prev,
@@ -817,13 +863,14 @@ function useSequencer() {
         };
       }),
     }));
-  }, []);
+  }, [pushUndo]);
 
   // -----------------------------------------------------------------------
   // Piano roll actions
   // -----------------------------------------------------------------------
 
   const addPianoNote = useCallback((pitch: number, step: number, duration: number = 1) => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) => {
@@ -848,9 +895,10 @@ function useSequencer() {
         };
       }),
     }));
-  }, []);
+  }, [pushUndo]);
 
   const deletePianoNote = useCallback((noteId: string) => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) => {
@@ -863,7 +911,7 @@ function useSequencer() {
         };
       }),
     }));
-  }, []);
+  }, [pushUndo]);
 
   const previewPianoNote = useCallback((pitch: number) => {
     const pattern = stateRef.current.patterns.find(
@@ -873,6 +921,7 @@ function useSequencer() {
   }, []);
 
   const updatePianoNote = useCallback((noteId: string, updates: { step?: number; duration?: number }) => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) => {
@@ -887,9 +936,10 @@ function useSequencer() {
         };
       }),
     }));
-  }, []);
+  }, [pushUndo]);
 
   const movePianoNotes = useCallback((noteIds: Set<string>, stepDelta: number, pitchDelta: number) => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) => {
@@ -910,9 +960,10 @@ function useSequencer() {
         };
       }),
     }));
-  }, []);
+  }, [pushUndo]);
 
   const pastePianoNotes = useCallback((notes: Omit<PianoNote, 'id'>[]) => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) => {
@@ -934,9 +985,10 @@ function useSequencer() {
         };
       }),
     }));
-  }, []);
+  }, [pushUndo]);
 
   const clearPianoRoll = useCallback(() => {
+    pushUndo();
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) =>
@@ -945,7 +997,7 @@ function useSequencer() {
           : pattern,
       ),
     }));
-  }, []);
+  }, [pushUndo]);
 
   // -----------------------------------------------------------------------
   // Arrangement actions
@@ -1900,6 +1952,8 @@ function useSequencer() {
     sampleTracks,
     activePattern,
     audioEngine: audioEngine.current,
+    undo,
+    redo,
     toggleStep,
     setStepVelocity,
     setStepPitch,

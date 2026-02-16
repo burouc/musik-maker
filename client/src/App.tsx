@@ -23,6 +23,8 @@ function App() {
     state,
     tracks,
     sampleTracks,
+    undo,
+    redo,
     toggleStep,
     setStepVelocity,
     setStepPitch,
@@ -160,27 +162,66 @@ function App() {
     }
   }, [deleteServerProject]);
 
-  // Ctrl+S / Ctrl+N / tab switching (1-4) keyboard shortcuts
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      const mod = e.ctrlKey || e.metaKey;
+      const tag = (e.target as HTMLElement).tagName;
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      // Ctrl+S — Save project
+      if (mod && e.key === 's') {
         e.preventDefault();
         handleSave();
+        return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      // Ctrl+N — New project
+      if (mod && e.key === 'n') {
         e.preventDefault();
         handleNew();
+        return;
       }
-      // Tab switching with number keys (only when not typing in an input)
-      const tag = (e.target as HTMLElement).tagName;
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+      // Ctrl+Z — Undo
+      if (mod && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+        return;
+      }
+      // Ctrl+Shift+Z or Ctrl+Y — Redo
+      if ((mod && e.key === 'z' && e.shiftKey) || (mod && e.key === 'y')) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
+      // Shortcuts below only fire when not typing in an input
+      if (isTyping) return;
+
+      // Space — Play/Stop
+      if (e.key === ' ') {
+        e.preventDefault();
+        togglePlay();
+        return;
+      }
+      // M — Toggle metronome
+      if (e.key === 'm' || e.key === 'M') {
+        toggleMetronome();
+        return;
+      }
+      // L — Toggle playback mode (pattern/song)
+      if (e.key === 'l' || e.key === 'L') {
+        setPlaybackMode(state.playbackMode === 'pattern' ? 'song' : 'pattern');
+        return;
+      }
+      // Tab switching with number keys (1-4)
+      if (!mod && !e.altKey) {
         const tab = VIEW_TABS.find((t) => t.shortcut === e.key);
         if (tab) setActiveTab(tab.id);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSave, handleNew]);
+  }, [handleSave, handleNew, undo, redo, togglePlay, toggleMetronome, setPlaybackMode, state.playbackMode]);
 
   return (
     <div className="app">
