@@ -1849,6 +1849,7 @@ function useSequencer() {
     audioEngine.current.setMasterVolume(project.masterVolume);
     audioEngine.current.setReverbParams(project.masterReverb);
     audioEngine.current.setDelayParams(project.masterDelay);
+    audioEngine.current.setDelayBpm(project.bpm, project.masterDelay.sync);
     audioEngine.current.setFilterParams(project.masterFilter);
   }, [API_BASE]);
 
