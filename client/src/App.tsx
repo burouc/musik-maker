@@ -42,6 +42,7 @@ function App() {
     setPatternStepCount,
     setMasterVolume,
     activePattern,
+    audioEngine,
   } = useSequencer();
 
   return (
@@ -84,6 +85,7 @@ function App() {
       <Mixer
         tracks={tracks}
         masterVolume={state.masterVolume}
+        audioEngine={audioEngine}
         onSetVolume={setTrackVolume}
         onSetPan={setTrackPan}
         onToggleMute={toggleMute}

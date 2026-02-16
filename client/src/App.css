@@ -524,6 +524,37 @@
   color: var(--accent);
 }
 
+/* VU meter + volume slider side by side */
+.mixer-meter-and-slider {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 80px;
+}
+
+/* VU meter: vertical LED-style bar */
+.vu-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 8px;
+  height: 80px;
+  justify-content: flex-end;
+}
+
+.vu-segment {
+  width: 100%;
+  flex: 1;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 0.06s ease-out;
+}
+
+.vu-segment.lit {
+  background: var(--seg-color);
+  box-shadow: 0 0 4px var(--seg-color);
+}
+
 /* Master channel */
 .mixer-master-channel {
   border-left: 2px solid var(--border);

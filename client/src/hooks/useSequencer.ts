@@ -802,6 +802,7 @@ function useSequencer() {
     state,
     tracks,
     activePattern,
+    audioEngine: audioEngine.current,
     toggleStep,
     setStepVelocity,
     setStepPitch,

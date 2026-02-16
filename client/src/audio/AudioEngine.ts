@@ -5,19 +5,34 @@ class AudioEngine {
   private masterGain: GainNode;
   private noiseBuffer: AudioBuffer;
   private panners: Map<InstrumentName, StereoPannerNode> = new Map();
+  private channelAnalysers: Map<InstrumentName, AnalyserNode> = new Map();
+  private masterAnalyser: AnalyserNode;
 
   constructor() {
     this.context = new AudioContext();
     this.masterGain = this.context.createGain();
-    this.masterGain.connect(this.context.destination);
+
+    // Master analyser sits between master gain and destination
+    this.masterAnalyser = this.context.createAnalyser();
+    this.masterAnalyser.fftSize = 256;
+    this.masterAnalyser.smoothingTimeConstant = 0.3;
+    this.masterGain.connect(this.masterAnalyser);
+    this.masterAnalyser.connect(this.context.destination);
     this.masterGain.gain.value = 0.8;
 
-    // Create a stereo panner per instrument channel
+    // Create a stereo panner + analyser per instrument channel
     const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion'];
     for (const name of instruments) {
+      const analyser = this.context.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
+
       const panner = this.context.createStereoPanner();
-      panner.connect(this.masterGain);
+      panner.connect(analyser);
+      analyser.connect(this.masterGain);
+
       this.panners.set(name, panner);
+      this.channelAnalysers.set(name, analyser);
     }
 
     // Pre-generate a reusable white noise buffer (2 seconds of noise)
@@ -128,6 +143,18 @@ class AudioEngine {
     if (panner) {
       panner.pan.value = Math.max(-1, Math.min(1, value));
     }
+  }
+
+  /** Read peak level (0–1) for a channel analyser. */
+  getChannelLevel(instrument: InstrumentName): number {
+    const analyser = this.channelAnalysers.get(instrument);
+    if (!analyser) return 0;
+    return this.readPeak(analyser);
+  }
+
+  /** Read peak level (0–1) for the master bus. */
+  getMasterLevel(): number {
+    return this.readPeak(this.masterAnalyser);
   }
 
   // ---------------------------------------------------------------------------
@@ -309,6 +336,19 @@ class AudioEngine {
     const source = this.context.createBufferSource();
     source.buffer = this.noiseBuffer;
     return source;
+  }
+
+  /** Read peak amplitude from an AnalyserNode using time-domain data. */
+  private readPeak(analyser: AnalyserNode): number {
+    const buf = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(buf);
+    let peak = 0;
+    for (let i = 0; i < buf.length; i++) {
+      // Convert from 0-255 (128 = silence) to 0-1 amplitude
+      const amplitude = Math.abs(buf[i] - 128) / 128;
+      if (amplitude > peak) peak = amplitude;
+    }
+    return peak;
   }
 }
 
