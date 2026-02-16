@@ -9,6 +9,8 @@ interface ArrangementProps {
   playbackMode: PlaybackMode;
   currentMeasure: number;
   isPlaying: boolean;
+  loopStart: number | null;
+  loopEnd: number | null;
   onToggleBlock: (arrTrackId: string, measure: number, patternId: string) => void;
   onPlaceBlock: (arrTrackId: string, measure: number, patternId: string) => void;
   onResizeBlock: (arrTrackId: string, startMeasure: number, newDuration: number) => void;
@@ -18,6 +20,9 @@ interface ArrangementProps {
   onRemoveTrack: (arrTrackId: string) => void;
   onSetLength: (length: number) => void;
   onSetPlaybackMode: (mode: PlaybackMode) => void;
+  onSetLoopStart: (measure: number | null) => void;
+  onSetLoopEnd: (measure: number | null) => void;
+  onClearLoop: () => void;
 }
 
 /** Cell width + gap must match CSS (48px cell + 2px gap) */
@@ -34,6 +39,8 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
   playbackMode,
   currentMeasure,
   isPlaying,
+  loopStart,
+  loopEnd,
   onToggleBlock,
   onPlaceBlock,
   onResizeBlock,
@@ -43,6 +50,9 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
   onRemoveTrack,
   onSetLength,
   onSetPlaybackMode,
+  onSetLoopStart,
+  onSetLoopEnd,
+  onClearLoop,
 }) {
   const [dropTarget, setDropTarget] = useState<{ trackId: string; measure: number } | null>(null);
 
@@ -149,6 +159,52 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
     document.addEventListener('mouseup', handleMouseUp);
   }, [onResizeBlock]);
 
+  // --- Loop marker interaction ---
+  const [settingLoop, setSettingLoop] = useState<'start' | 'end' | null>(null);
+
+  const handleMeasureClick = useCallback((m: number, e: React.MouseEvent) => {
+    // Left-click on measure number: set loop start on first click, end on second
+    e.preventDefault();
+    if (loopStart === null) {
+      // No loop yet — set start
+      onSetLoopStart(m);
+      setSettingLoop('end');
+    } else if (settingLoop === 'end') {
+      // Setting end point
+      if (m > loopStart) {
+        onSetLoopEnd(m + 1); // exclusive end
+      } else if (m < loopStart) {
+        // Clicked before start — swap: new start here, old start becomes end
+        onSetLoopEnd(loopStart + 1);
+        onSetLoopStart(m);
+      }
+      setSettingLoop(null);
+    } else {
+      // Loop already exists — click to move start
+      if (m === loopStart && loopEnd !== null) {
+        // Click on start marker — clear loop
+        onClearLoop();
+      } else {
+        onSetLoopStart(m);
+        setSettingLoop('end');
+      }
+    }
+  }, [loopStart, loopEnd, settingLoop, onSetLoopStart, onSetLoopEnd, onClearLoop]);
+
+  const handleMeasureRightClick = useCallback((m: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    if (loopStart !== null && loopEnd !== null) {
+      // Clear loop on right-click
+      onClearLoop();
+      setSettingLoop(null);
+    }
+  }, [loopStart, loopEnd, onClearLoop]);
+
+  const isInLoop = useCallback((m: number) => {
+    if (loopStart === null || loopEnd === null) return false;
+    return m >= loopStart && m < loopEnd;
+  }, [loopStart, loopEnd]);
+
   const measures = Array.from({ length: arrangementLength }, (_, i) => i);
 
   return (
@@ -183,11 +239,52 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
           <button className="arrangement-add-track-btn" onClick={onAddTrack}>
             + Track
           </button>
+          {loopStart !== null && loopEnd !== null && (
+            <button
+              className="arrangement-clear-loop-btn"
+              onClick={() => { onClearLoop(); setSettingLoop(null); }}
+              title="Clear loop region"
+            >
+              Clear Loop
+            </button>
+          )}
         </div>
       </div>
 
       <div className="arrangement-grid-wrapper">
         <div className="arrangement-grid">
+          {/* Loop region bar */}
+          <div className="arrangement-row arrangement-loop-bar">
+            <div className="arrangement-track-label loop-bar-label">
+              {settingLoop === 'end'
+                ? <span className="loop-hint">Click end measure</span>
+                : <span className="loop-hint">Loop</span>
+              }
+            </div>
+            {measures.map((m) => {
+              const inLoop = isInLoop(m);
+              const isStart = m === loopStart;
+              const isEnd = loopEnd !== null && m === loopEnd - 1;
+              return (
+                <div
+                  key={m}
+                  className={`arrangement-loop-cell${
+                    m % 4 === 0 ? ' bar-start' : ''
+                  }${inLoop ? ' in-loop' : ''}${isStart ? ' loop-start' : ''}${isEnd ? ' loop-end' : ''}${
+                    settingLoop !== null ? ' setting' : ''
+                  }`}
+                  onClick={(e) => handleMeasureClick(m, e)}
+                  onContextMenu={(e) => handleMeasureRightClick(m, e)}
+                  title={
+                    inLoop
+                      ? `Loop measure ${m + 1} (right-click to clear)`
+                      : `Click to set loop ${loopStart === null || settingLoop !== 'end' ? 'start' : 'end'}`
+                  }
+                />
+              );
+            })}
+          </div>
+
           {/* Measure numbers header */}
           <div className="arrangement-row arrangement-measure-numbers">
             <div className="arrangement-track-label" />
@@ -196,7 +293,7 @@ const Arrangement = React.memo<ArrangementProps>(function Arrangement({
                 key={m}
                 className={`arrangement-measure-num${
                   m % 4 === 0 ? ' bar-start' : ''
-                }${isPlaying && playbackMode === 'song' && m === currentMeasure ? ' current' : ''}`}
+                }${isPlaying && playbackMode === 'song' && m === currentMeasure ? ' current' : ''}${isInLoop(m) ? ' in-loop' : ''}`}
               >
                 {m + 1}
               </div>

@@ -249,4 +249,8 @@ export interface SequencerState {
   masterDelay: DelaySettings;
   /** Master filter effect settings */
   masterFilter: FilterSettings;
+  /** Loop start measure (0-based, inclusive) — null means no loop */
+  loopStart: number | null;
+  /** Loop end measure (0-based, exclusive) — null means no loop */
+  loopEnd: number | null;
 }

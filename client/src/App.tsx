@@ -43,6 +43,9 @@ function App() {
     removeArrangementTrack,
     setArrangementLength,
     setPlaybackMode,
+    setLoopStart,
+    setLoopEnd,
+    clearLoopMarkers,
     setPatternStepCount,
     setMasterVolume,
     setTrackReverbSend,
@@ -179,6 +182,8 @@ function App() {
         playbackMode={state.playbackMode}
         currentMeasure={state.currentMeasure}
         isPlaying={state.isPlaying}
+        loopStart={state.loopStart}
+        loopEnd={state.loopEnd}
         onToggleBlock={toggleArrangementBlock}
         onPlaceBlock={placeArrangementBlock}
         onResizeBlock={resizeArrangementBlock}
@@ -188,6 +193,9 @@ function App() {
         onRemoveTrack={removeArrangementTrack}
         onSetLength={setArrangementLength}
         onSetPlaybackMode={setPlaybackMode}
+        onSetLoopStart={setLoopStart}
+        onSetLoopEnd={setLoopEnd}
+        onClearLoop={clearLoopMarkers}
       />
     </div>
   );

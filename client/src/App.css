@@ -1269,6 +1269,81 @@
   cursor: grabbing;
 }
 
+/* Loop marker bar */
+.arrangement-loop-bar {
+  margin-bottom: 2px;
+  height: 14px;
+  align-items: center;
+}
+
+.loop-bar-label {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  justify-content: flex-end;
+}
+
+.loop-hint {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.arrangement-loop-cell {
+  width: 48px;
+  min-width: 48px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--bg-primary);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.arrangement-loop-cell:hover {
+  background: rgba(78, 205, 196, 0.2);
+}
+
+.arrangement-loop-cell.setting:hover {
+  background: rgba(78, 205, 196, 0.35);
+}
+
+.arrangement-loop-cell.bar-start {
+  margin-left: 4px;
+}
+
+.arrangement-loop-cell.in-loop {
+  background: rgba(78, 205, 196, 0.35);
+}
+
+.arrangement-loop-cell.loop-start {
+  border-radius: 4px 2px 2px 4px;
+  border-left: 3px solid #4ecdc4;
+}
+
+.arrangement-loop-cell.loop-end {
+  border-radius: 2px 4px 4px 2px;
+  border-right: 3px solid #4ecdc4;
+}
+
+.arrangement-measure-num.in-loop {
+  color: #4ecdc4;
+}
+
+.arrangement-clear-loop-btn {
+  padding: 5px 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 4px;
+  background: transparent;
+  color: #4ecdc4;
+  border: 1px solid #4ecdc4;
+  transition: background 0.15s, color 0.15s;
+}
+
+.arrangement-clear-loop-btn:hover {
+  background: rgba(78, 205, 196, 0.15);
+}
+
 /* =========================================================================
    Piano Roll
    ========================================================================= */

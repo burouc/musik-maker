@@ -110,6 +110,8 @@ const INITIAL_STATE: SequencerState = {
   masterReverb: { send: 0, decay: 2, preDelay: 0.01, damping: 0.3 },
   masterDelay: { send: 0, sync: '1/8' as const, feedback: 0.4, mix: 0.7 },
   masterFilter: { send: 0, type: 'lowpass' as const, cutoff: 2000, resonance: 1 },
+  loopStart: null,
+  loopEnd: null,
 };
 
 function useSequencer() {
@@ -206,14 +208,23 @@ function useSequencer() {
             // Advance to next measure when we wrap around to step 0
             if (nextStep === 0) {
               nextMeasure = prev.currentMeasure + 1;
-              if (nextMeasure >= prev.arrangementLength) {
-                // Song finished - stop playback
-                return {
-                  ...prev,
-                  isPlaying: false,
-                  currentStep: -1,
-                  currentMeasure: -1,
-                };
+
+              const hasLoop = prev.loopStart !== null && prev.loopEnd !== null;
+              const loopEnd = hasLoop ? prev.loopEnd! : prev.arrangementLength;
+
+              if (nextMeasure >= loopEnd) {
+                if (hasLoop) {
+                  // Loop back to loop start
+                  nextMeasure = prev.loopStart!;
+                } else {
+                  // Song finished - stop playback
+                  return {
+                    ...prev,
+                    isPlaying: false,
+                    currentStep: -1,
+                    currentMeasure: -1,
+                  };
+                }
               }
             }
 
@@ -469,15 +480,15 @@ function useSequencer() {
         audioEngine.current.stopAllSamples();
       }
 
+      const songStart = prev.playbackMode === 'song'
+        ? (prev.loopStart !== null ? prev.loopStart - 1 : -1)
+        : prev.currentMeasure;
+
       return {
         ...prev,
         isPlaying: nextPlaying,
         currentStep: nextPlaying ? prev.currentStep : -1,
-        currentMeasure: nextPlaying
-          ? prev.playbackMode === 'song'
-            ? -1
-            : prev.currentMeasure
-          : -1,
+        currentMeasure: nextPlaying ? songStart : -1,
       };
     });
   }, []);
@@ -976,6 +987,42 @@ function useSequencer() {
     setState((prev) => ({
       ...prev,
       arrangementLength: Math.max(4, Math.min(64, length)),
+    }));
+  }, []);
+
+  const setLoopStart = useCallback((measure: number | null) => {
+    setState((prev) => ({
+      ...prev,
+      loopStart: measure,
+      // Clear loop end if start is cleared or end is before/equal to start
+      loopEnd: measure === null ? null
+        : (prev.loopEnd !== null && prev.loopEnd > measure ? prev.loopEnd : null),
+    }));
+  }, []);
+
+  const setLoopEnd = useCallback((measure: number | null) => {
+    setState((prev) => ({
+      ...prev,
+      loopEnd: measure,
+      // Clear loop start if end is cleared or start is after/equal to end
+      loopStart: measure === null ? null
+        : (prev.loopStart !== null && prev.loopStart < measure ? prev.loopStart : null),
+    }));
+  }, []);
+
+  const setLoopMarkers = useCallback((start: number | null, end: number | null) => {
+    setState((prev) => ({
+      ...prev,
+      loopStart: start,
+      loopEnd: end !== null && start !== null && end > start ? end : null,
+    }));
+  }, []);
+
+  const clearLoopMarkers = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      loopStart: null,
+      loopEnd: null,
     }));
   }, []);
 
@@ -1493,6 +1540,10 @@ function useSequencer() {
     removeArrangementTrack,
     setArrangementLength,
     setPlaybackMode,
+    setLoopStart,
+    setLoopEnd,
+    setLoopMarkers,
+    clearLoopMarkers,
     setPatternStepCount,
     setMasterVolume,
     setTrackReverbSend,
