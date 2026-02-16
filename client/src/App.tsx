@@ -7,6 +7,7 @@ import PatternSelector from './components/PatternSelector';
 import PianoRoll from './components/PianoRoll';
 import Arrangement from './components/Arrangement';
 import AutomationLanes from './components/AutomationLanes';
+import ResizablePanel from './components/ResizablePanel';
 import './App.css';
 
 function App() {
@@ -252,30 +253,33 @@ function App() {
         onRenamePattern={renamePattern}
       />
 
-      <StepSequencer
-        tracks={tracks}
-        sampleTracks={sampleTracks}
-        samples={state.samples}
-        stepCount={activePattern?.stepCount ?? 16}
-        currentStep={state.currentStep}
-        isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
-        onToggleStep={toggleStep}
-        onSetStepVelocity={setStepVelocity}
-        onSetStepPitch={setStepPitch}
-        onStepCountChange={setPatternStepCount}
-        onToggleSampleStep={toggleSampleStep}
-        onSetSampleStepVelocity={setSampleStepVelocity}
-        onSetSampleStepPitch={setSampleStepPitch}
-        onSetSampleTrackSample={setSampleTrackSample}
-        onSetSampleTrackPlaybackMode={setSampleTrackPlaybackMode}
-        onLoadSample={loadSample}
-        onPreviewSample={previewSample}
-        onStopPreview={stopPreview}
-        onAddSampleTrack={addSampleTrack}
-        onRemoveSampleTrack={removeSampleTrack}
-      />
+      <ResizablePanel defaultHeight={280} minHeight={100} maxHeight={800} className="panel-sequencer">
+        <StepSequencer
+          tracks={tracks}
+          sampleTracks={sampleTracks}
+          samples={state.samples}
+          stepCount={activePattern?.stepCount ?? 16}
+          currentStep={state.currentStep}
+          isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
+          onToggleStep={toggleStep}
+          onSetStepVelocity={setStepVelocity}
+          onSetStepPitch={setStepPitch}
+          onStepCountChange={setPatternStepCount}
+          onToggleSampleStep={toggleSampleStep}
+          onSetSampleStepVelocity={setSampleStepVelocity}
+          onSetSampleStepPitch={setSampleStepPitch}
+          onSetSampleTrackSample={setSampleTrackSample}
+          onSetSampleTrackPlaybackMode={setSampleTrackPlaybackMode}
+          onLoadSample={loadSample}
+          onPreviewSample={previewSample}
+          onStopPreview={stopPreview}
+          onAddSampleTrack={addSampleTrack}
+          onRemoveSampleTrack={removeSampleTrack}
+        />
+      </ResizablePanel>
 
-      <Mixer
+      <ResizablePanel defaultHeight={340} minHeight={120} maxHeight={800} className="panel-mixer">
+        <Mixer
         tracks={tracks}
         sampleTracks={sampleTracks}
         masterVolume={state.masterVolume}
@@ -304,9 +308,11 @@ function App() {
         onSetSampleDelaySend={setSampleTrackDelaySend}
         onSetSampleFilterSend={setSampleTrackFilterSend}
       />
+      </ResizablePanel>
 
-      {activePattern && (
-        <PianoRoll
+      <ResizablePanel defaultHeight={380} minHeight={120} maxHeight={800} className="panel-piano-roll">
+        {activePattern && (
+          <PianoRoll
           pianoRoll={activePattern.pianoRoll}
           stepCount={activePattern.stepCount}
           currentStep={state.currentStep}
@@ -320,9 +326,11 @@ function App() {
           onPasteNotes={pastePianoNotes}
           onSynthSettingsChange={setSynthSettings}
         />
-      )}
+        )}
+      </ResizablePanel>
 
-      <Arrangement
+      <ResizablePanel defaultHeight={400} minHeight={120} maxHeight={1000} className="panel-arrangement" showDivider={false}>
+        <Arrangement
         patterns={state.patterns}
         activePatternId={state.activePatternId}
         arrangement={state.arrangement}
@@ -362,6 +370,7 @@ function App() {
         onRemovePoint={removeAutomationPoint}
         onClearLane={clearAutomationLane}
       />
+      </ResizablePanel>
     </div>
   );
 }

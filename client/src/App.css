@@ -193,6 +193,80 @@
 }
 
 /* =========================================================================
+   Resizable panels & dividers
+   ========================================================================= */
+
+.resizable-panel {
+  overflow: auto;
+  position: relative;
+}
+
+.resizable-panel > .step-sequencer,
+.resizable-panel > .mixer,
+.resizable-panel > .piano-roll,
+.resizable-panel > .arrangement,
+.resizable-panel > .automation-lanes {
+  height: 100%;
+  margin-bottom: 0;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.panel-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  user-select: none;
+  flex-shrink: 0;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.panel-divider.vertical {
+  height: 8px;
+  margin: 2px 0;
+}
+
+.panel-divider.horizontal {
+  width: 8px;
+  margin: 0 2px;
+  cursor: col-resize;
+}
+
+.panel-divider:hover,
+.panel-divider.active {
+  background: rgba(233, 69, 96, 0.15);
+}
+
+.panel-divider-handle {
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.panel-divider.vertical .panel-divider-handle {
+  width: 48px;
+  height: 3px;
+}
+
+.panel-divider.horizontal .panel-divider-handle {
+  width: 3px;
+  height: 48px;
+}
+
+.panel-divider:hover .panel-divider-handle,
+.panel-divider.active .panel-divider-handle {
+  background: var(--accent);
+  transform: scaleX(1.5);
+}
+
+.panel-divider.horizontal:hover .panel-divider-handle,
+.panel-divider.horizontal.active .panel-divider-handle {
+  transform: scaleY(1.5);
+}
+
+/* =========================================================================
    Transport controls
    ========================================================================= */
 
