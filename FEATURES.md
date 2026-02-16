@@ -57,7 +57,7 @@ Features are grouped by category. Each item is marked with a priority:
 ### 3. Mixer / Audio Routing
 
 - [x] **[P0]** Master channel with master volume
-- [ ] **[P0]** Per-channel pan control
+- [x] **[P0]** Per-channel pan control
 - [ ] **[P0]** Visual VU meters (peak level display)
 - [ ] **[P1]** Insert effect slots per mixer track (chain up to 8 effects)
 - [ ] **[P1]** Send channels (route audio to FX buses)
