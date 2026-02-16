@@ -17,6 +17,7 @@ function App() {
     togglePlay,
     setBpm,
     setTrackVolume,
+    setTrackPan,
     toggleMute,
     toggleSolo,
     clearTrack,
@@ -84,6 +85,7 @@ function App() {
         tracks={tracks}
         masterVolume={state.masterVolume}
         onSetVolume={setTrackVolume}
+        onSetPan={setTrackPan}
         onToggleMute={toggleMute}
         onToggleSolo={toggleSolo}
         onClearTrack={clearTrack}

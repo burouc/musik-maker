@@ -4,12 +4,21 @@ class AudioEngine {
   private context: AudioContext;
   private masterGain: GainNode;
   private noiseBuffer: AudioBuffer;
+  private panners: Map<InstrumentName, StereoPannerNode> = new Map();
 
   constructor() {
     this.context = new AudioContext();
     this.masterGain = this.context.createGain();
     this.masterGain.connect(this.context.destination);
     this.masterGain.gain.value = 0.8;
+
+    // Create a stereo panner per instrument channel
+    const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion'];
+    for (const name of instruments) {
+      const panner = this.context.createStereoPanner();
+      panner.connect(this.masterGain);
+      this.panners.set(name, panner);
+    }
 
     // Pre-generate a reusable white noise buffer (2 seconds of noise)
     const sampleRate = this.context.sampleRate;
@@ -82,25 +91,26 @@ class AudioEngine {
 
   async playSound(instrument: InstrumentName, volume: number, pitchOffset: number = 0): Promise<void> {
     await this.resume();
+    const output = this.panners.get(instrument) ?? this.masterGain;
 
     switch (instrument) {
       case 'kick':
-        this.playKick(volume, pitchOffset);
+        this.playKick(volume, pitchOffset, output);
         break;
       case 'snare':
-        this.playSnare(volume, pitchOffset);
+        this.playSnare(volume, pitchOffset, output);
         break;
       case 'hihat':
-        this.playHihat(volume, pitchOffset);
+        this.playHihat(volume, pitchOffset, output);
         break;
       case 'clap':
-        this.playClap(volume, pitchOffset);
+        this.playClap(volume, pitchOffset, output);
         break;
       case 'openhat':
-        this.playOpenHat(volume, pitchOffset);
+        this.playOpenHat(volume, pitchOffset, output);
         break;
       case 'percussion':
-        this.playPercussion(volume, pitchOffset);
+        this.playPercussion(volume, pitchOffset, output);
         break;
     }
   }
@@ -113,6 +123,13 @@ class AudioEngine {
     return this.masterGain.gain.value;
   }
 
+  setChannelPan(instrument: InstrumentName, value: number): void {
+    const panner = this.panners.get(instrument);
+    if (panner) {
+      panner.pan.value = Math.max(-1, Math.min(1, value));
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Private synthesis methods
   // ---------------------------------------------------------------------------
@@ -122,7 +139,7 @@ class AudioEngine {
     return Math.pow(2, semitones / 12);
   }
 
-  private playKick(volume: number, pitchOffset: number = 0): void {
+  private playKick(volume: number, pitchOffset: number = 0, output: AudioNode = this.masterGain): void {
     const now = this.context.currentTime;
     const ratio = this.pitchRatio(pitchOffset);
 
@@ -138,13 +155,13 @@ class AudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(output);
 
     osc.start(now);
     osc.stop(now + 0.3);
   }
 
-  private playSnare(volume: number, pitchOffset: number = 0): void {
+  private playSnare(volume: number, pitchOffset: number = 0, output: AudioNode = this.masterGain): void {
     const now = this.context.currentTime;
     const ratio = this.pitchRatio(pitchOffset);
 
@@ -158,7 +175,7 @@ class AudioEngine {
     oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     osc.connect(oscGain);
-    oscGain.connect(this.masterGain);
+    oscGain.connect(output);
 
     osc.start(now);
     osc.stop(now + 0.08);
@@ -177,13 +194,13 @@ class AudioEngine {
 
     noise.connect(bandpass);
     bandpass.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
+    noiseGain.connect(output);
 
     noise.start(now);
     noise.stop(now + 0.15);
   }
 
-  private playHihat(volume: number, pitchOffset: number = 0): void {
+  private playHihat(volume: number, pitchOffset: number = 0, output: AudioNode = this.masterGain): void {
     const now = this.context.currentTime;
     const ratio = this.pitchRatio(pitchOffset);
 
@@ -199,13 +216,13 @@ class AudioEngine {
 
     noise.connect(highpass);
     highpass.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(output);
 
     noise.start(now);
     noise.stop(now + 0.05);
   }
 
-  private playClap(volume: number, pitchOffset: number = 0): void {
+  private playClap(volume: number, pitchOffset: number = 0, output: AudioNode = this.masterGain): void {
     const now = this.context.currentTime;
     const ratio = this.pitchRatio(pitchOffset);
 
@@ -236,13 +253,13 @@ class AudioEngine {
 
     noise.connect(bandpass);
     bandpass.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(output);
 
     noise.start(now);
     noise.stop(decayStart + 0.15);
   }
 
-  private playOpenHat(volume: number, pitchOffset: number = 0): void {
+  private playOpenHat(volume: number, pitchOffset: number = 0, output: AudioNode = this.masterGain): void {
     const now = this.context.currentTime;
     const ratio = this.pitchRatio(pitchOffset);
 
@@ -258,13 +275,13 @@ class AudioEngine {
 
     noise.connect(highpass);
     highpass.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(output);
 
     noise.start(now);
     noise.stop(now + 0.3);
   }
 
-  private playPercussion(volume: number, pitchOffset: number = 0): void {
+  private playPercussion(volume: number, pitchOffset: number = 0, output: AudioNode = this.masterGain): void {
     const now = this.context.currentTime;
     const ratio = this.pitchRatio(pitchOffset);
 
@@ -278,7 +295,7 @@ class AudioEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(output);
 
     osc.start(now);
     osc.stop(now + 0.08);

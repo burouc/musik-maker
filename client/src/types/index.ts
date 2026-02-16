@@ -14,6 +14,8 @@ export interface Track {
   /** Per-step pitch offset in semitones (−12 to +12, default 0) */
   pitches: number[];
   volume: number;
+  /** Stereo pan position: −1 (full left) to +1 (full right), 0 = center */
+  pan: number;
   muted: boolean;
   solo: boolean;
 }

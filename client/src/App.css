@@ -478,6 +478,17 @@
   color: var(--text-secondary);
 }
 
+.mixer-pan-slider {
+  width: 60px;
+  accent-color: var(--accent);
+}
+
+.mixer-pan-display {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
 .mixer-btn {
   width: 36px;
   height: 28px;

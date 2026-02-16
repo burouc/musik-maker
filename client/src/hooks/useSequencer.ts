@@ -28,12 +28,12 @@ const DEFAULT_VELOCITY = 0.8;
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
-    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
-    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
-    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
-    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, muted: false, solo: false },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false },
   ];
 }
 
@@ -432,6 +432,29 @@ function useSequencer() {
     [],
   );
 
+  const setTrackPan = useCallback(
+    (trackId: InstrumentName, pan: number) => {
+      const clamped = Math.max(-1, Math.min(1, pan));
+      audioEngine.current.setChannelPan(trackId, clamped);
+      setState((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
+            ? {
+                ...pattern,
+                tracks: pattern.tracks.map((track) =>
+                  track.id === trackId
+                    ? { ...track, pan: clamped }
+                    : track,
+                ),
+              }
+            : pattern,
+        ),
+      }));
+    },
+    [],
+  );
+
   const toggleMute = useCallback((trackId: InstrumentName) => {
     setState((prev) => ({
       ...prev,
@@ -785,6 +808,7 @@ function useSequencer() {
     togglePlay,
     setBpm,
     setTrackVolume,
+    setTrackPan,
     toggleMute,
     toggleSolo,
     clearTrack,
