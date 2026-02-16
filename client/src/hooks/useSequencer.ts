@@ -546,33 +546,42 @@ function useSequencer() {
   // Piano roll actions
   // -----------------------------------------------------------------------
 
-  const togglePianoNote = useCallback((pitch: number, step: number) => {
+  const addPianoNote = useCallback((pitch: number, step: number, duration: number = 1) => {
     setState((prev) => ({
       ...prev,
       patterns: prev.patterns.map((pattern) => {
         if (pattern.id !== prev.activePatternId) return pattern;
-        const existing = pattern.pianoRoll.notes.find(
-          (n) => n.pitch === pitch && n.step === step,
+        // Remove any existing notes that overlap with the new note's range
+        const newEnd = step + duration;
+        const filtered = pattern.pianoRoll.notes.filter(
+          (n) => n.pitch !== pitch || n.step + n.duration <= step || n.step >= newEnd,
         );
-        if (existing) {
-          return {
-            ...pattern,
-            pianoRoll: {
-              notes: pattern.pianoRoll.notes.filter((n) => n.id !== existing.id),
-            },
-          };
-        }
         const newNote: PianoNote = {
           id: `note-${Date.now()}-${pitch}-${step}`,
           pitch,
           step,
-          duration: 1,
+          duration,
           velocity: 0.8,
         };
         return {
           ...pattern,
           pianoRoll: {
-            notes: [...pattern.pianoRoll.notes, newNote],
+            notes: [...filtered, newNote],
+          },
+        };
+      }),
+    }));
+  }, []);
+
+  const deletePianoNote = useCallback((noteId: string) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        return {
+          ...pattern,
+          pianoRoll: {
+            notes: pattern.pianoRoll.notes.filter((n) => n.id !== noteId),
           },
         };
       }),
@@ -714,7 +723,8 @@ function useSequencer() {
     deletePattern,
     renamePattern,
     duplicatePattern,
-    togglePianoNote,
+    addPianoNote,
+    deletePianoNote,
     previewPianoNote,
     clearPianoRoll,
     toggleArrangementBlock,

@@ -972,6 +972,52 @@
   margin-left: 4px;
 }
 
+/* Note bar overlay for multi-step notes */
+.piano-roll-cell {
+  position: relative;
+  user-select: none;
+}
+
+.piano-note-bar {
+  position: absolute;
+  top: 1px;
+  left: 0;
+  bottom: 1px;
+  background: var(--accent);
+  border-radius: 2px;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(233, 69, 96, 0.4);
+  border: 1px solid var(--accent-hover);
+}
+
+/* Note start cell (first cell of a note) */
+.piano-roll-cell.note-start {
+  z-index: 2;
+}
+
+/* Continuation cells: keep them visually active but muted */
+.piano-roll-cell.note-continuation {
+  background: var(--accent);
+  opacity: 0.6;
+  border-color: var(--accent-hover);
+}
+
+.piano-roll-cell.note-continuation.current {
+  opacity: 0.8;
+  border-color: #fff;
+}
+
+/* Drag preview */
+.piano-roll-cell.drag-preview {
+  background: rgba(233, 69, 96, 0.4);
+  border-color: rgba(233, 69, 96, 0.6);
+}
+
+.piano-roll-cell.drag-start {
+  background: rgba(233, 69, 96, 0.5);
+}
+
 /* =========================================================================
    Responsive
    ========================================================================= */

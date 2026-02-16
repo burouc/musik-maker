@@ -26,7 +26,8 @@ function App() {
     deletePattern,
     renamePattern,
     duplicatePattern,
-    togglePianoNote,
+    addPianoNote,
+    deletePianoNote,
     previewPianoNote,
     toggleArrangementBlock,
     toggleArrangementTrackMute,
@@ -89,7 +90,8 @@ function App() {
           stepCount={activePattern.stepCount}
           currentStep={state.currentStep}
           isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
-          onToggleNote={togglePianoNote}
+          onAddNote={addPianoNote}
+          onDeleteNote={deletePianoNote}
           onPreviewNote={previewPianoNote}
         />
       )}
