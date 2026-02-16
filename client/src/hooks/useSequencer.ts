@@ -632,6 +632,30 @@ function useSequencer() {
     }));
   }, []);
 
+  const pastePianoNotes = useCallback((notes: Omit<PianoNote, 'id'>[]) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        // Filter out notes that fall outside bounds
+        const valid = notes.filter(
+          (n) => n.step >= 0 && n.step + n.duration <= pattern.stepCount && n.pitch >= 36 && n.pitch <= 83,
+        );
+        if (valid.length === 0) return pattern;
+        const newNotes = valid.map((n, i) => ({
+          ...n,
+          id: `note-${Date.now()}-${i}-${n.pitch}-${n.step}`,
+        }));
+        return {
+          ...pattern,
+          pianoRoll: {
+            notes: [...pattern.pianoRoll.notes, ...newNotes],
+          },
+        };
+      }),
+    }));
+  }, []);
+
   const clearPianoRoll = useCallback(() => {
     setState((prev) => ({
       ...prev,
@@ -768,6 +792,7 @@ function useSequencer() {
     updatePianoNote,
     previewPianoNote,
     movePianoNotes,
+    pastePianoNotes,
     clearPianoRoll,
     toggleArrangementBlock,
     toggleArrangementTrackMute,

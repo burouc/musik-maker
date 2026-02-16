@@ -77,6 +77,7 @@ interface PianoRollProps {
   onUpdateNote: (noteId: string, updates: { step?: number; duration?: number }) => void;
   onPreviewNote: (pitch: number) => void;
   onMoveNotes: (noteIds: Set<string>, stepDelta: number, pitchDelta: number) => void;
+  onPasteNotes: (notes: Omit<PianoNote, 'id'>[]) => void;
 }
 
 function PianoRoll({
@@ -89,6 +90,7 @@ function PianoRoll({
   onUpdateNote,
   onPreviewNote,
   onMoveNotes,
+  onPasteNotes,
 }: PianoRollProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -99,6 +101,8 @@ function PianoRoll({
   const moveRef = useRef<MoveState | null>(null);
   const [boxSelect, setBoxSelect] = useState<BoxSelectState | null>(null);
   const boxSelectRef = useRef<BoxSelectState | null>(null);
+  /** Clipboard: stores copied notes with positions relative to the selection origin */
+  const clipboardRef = useRef<Omit<PianoNote, 'id'>[]>([]);
 
   // Build a lookup: for each pitch, a sorted list of notes
   const notesByPitch = useRef<Map<number, PianoNote[]>>(new Map());
@@ -414,6 +418,67 @@ function PianoRoll({
         return;
       }
 
+      // Ctrl+C / Cmd+C: copy selected notes
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if (selectedNoteIds.size === 0) return;
+        e.preventDefault();
+        const selected = pianoRoll.notes.filter((n) => selectedNoteIds.has(n.id));
+        // Store relative to the top-left of the selection
+        const minStep = Math.min(...selected.map((n) => n.step));
+        const minPitch = Math.min(...selected.map((n) => n.pitch));
+        clipboardRef.current = selected.map((n) => ({
+          pitch: n.pitch - minPitch,
+          step: n.step - minStep,
+          duration: n.duration,
+          velocity: n.velocity,
+        }));
+        return;
+      }
+
+      // Ctrl+V / Cmd+V: paste notes at the selection's original position
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        if (clipboardRef.current.length === 0) return;
+        e.preventDefault();
+        // Paste at the earliest selected note position, or at step 0 / lowest pitch if nothing selected
+        let baseStep = 0;
+        let basePitch = 60; // middle C default
+        if (selectedNoteIds.size > 0) {
+          const selected = pianoRoll.notes.filter((n) => selectedNoteIds.has(n.id));
+          baseStep = Math.min(...selected.map((n) => n.step));
+          basePitch = Math.min(...selected.map((n) => n.pitch));
+        }
+        const pasted = clipboardRef.current.map((n) => ({
+          pitch: n.pitch + basePitch,
+          step: n.step + baseStep,
+          duration: n.duration,
+          velocity: n.velocity,
+        }));
+        onPasteNotes(pasted);
+        // Select the newly pasted notes (they'll get new IDs from the hook)
+        // We can't know the IDs yet, so just clear selection
+        setSelectedNoteIds(new Set());
+        return;
+      }
+
+      // Ctrl+D / Cmd+D: duplicate selected notes (paste 1 step after last selected note)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        if (selectedNoteIds.size === 0) return;
+        e.preventDefault();
+        const selected = pianoRoll.notes.filter((n) => selectedNoteIds.has(n.id));
+        const maxEnd = Math.max(...selected.map((n) => n.step + n.duration));
+        const minStep = Math.min(...selected.map((n) => n.step));
+        const stepOffset = maxEnd - minStep;
+        const duplicated = selected.map((n) => ({
+          pitch: n.pitch,
+          step: n.step + stepOffset,
+          duration: n.duration,
+          velocity: n.velocity,
+        }));
+        onPasteNotes(duplicated);
+        setSelectedNoteIds(new Set());
+        return;
+      }
+
       // Escape: clear selection
       if (e.key === 'Escape') {
         if (selectedNoteIds.size > 0) {
@@ -446,7 +511,7 @@ function PianoRoll({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedNoteIds, onDeleteNote, onMoveNotes, pianoRoll.notes]);
+  }, [selectedNoteIds, onDeleteNote, onMoveNotes, onPasteNotes, pianoRoll.notes]);
 
   // Clear selected notes that no longer exist
   useEffect(() => {

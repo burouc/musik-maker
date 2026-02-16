@@ -31,6 +31,7 @@ function App() {
     updatePianoNote,
     previewPianoNote,
     movePianoNotes,
+    pastePianoNotes,
     toggleArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
@@ -97,6 +98,7 @@ function App() {
           onUpdateNote={updatePianoNote}
           onPreviewNote={previewPianoNote}
           onMoveNotes={movePianoNotes}
+          onPasteNotes={pastePianoNotes}
         />
       )}
 
