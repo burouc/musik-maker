@@ -2100,6 +2100,75 @@
   margin: 0 4px;
 }
 
+/* Velocity lane below the piano roll grid */
+.velocity-lane {
+  display: flex;
+  align-items: stretch;
+  height: 60px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 4px;
+}
+
+.velocity-lane-label {
+  width: 60px;
+  min-width: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.velocity-lane-bars {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.velocity-lane-step {
+  flex: 1;
+  min-width: 20px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+
+.velocity-lane-step:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.velocity-lane-step.beat-start {
+  margin-left: 4px;
+}
+
+.velocity-lane-step.current {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.velocity-bar {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  opacity: 0.8;
+  transition: height 0.05s;
+}
+
+.velocity-bar:hover {
+  opacity: 1;
+}
+
 /* Selection count indicator in header */
 .piano-roll-selection-count {
   font-size: 0.7rem;

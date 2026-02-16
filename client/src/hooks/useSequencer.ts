@@ -1026,6 +1026,25 @@ function useSequencer() {
     }));
   }, [pushUndo]);
 
+  const updatePianoNoteVelocity = useCallback((noteId: string, velocity: number) => {
+    pushUndo();
+    const clamped = Math.max(0.05, Math.min(1, velocity));
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        return {
+          ...pattern,
+          pianoRoll: {
+            notes: pattern.pianoRoll.notes.map((n) =>
+              n.id === noteId ? { ...n, velocity: clamped } : n,
+            ),
+          },
+        };
+      }),
+    }));
+  }, [pushUndo]);
+
   const clearPianoRoll = useCallback(() => {
     pushUndo();
     setState((prev) => ({
@@ -2019,6 +2038,7 @@ function useSequencer() {
     previewPianoNote,
     movePianoNotes,
     pastePianoNotes,
+    updatePianoNoteVelocity,
     clearPianoRoll,
     toggleArrangementBlock,
     placeArrangementBlock,

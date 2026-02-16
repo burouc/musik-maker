@@ -49,6 +49,7 @@ function App() {
     previewPianoNote,
     movePianoNotes,
     pastePianoNotes,
+    updatePianoNoteVelocity,
     toggleArrangementBlock,
     placeArrangementBlock,
     resizeArrangementBlock,
@@ -367,6 +368,7 @@ function App() {
               onPreviewNote={previewPianoNote}
               onMoveNotes={movePianoNotes}
               onPasteNotes={pastePianoNotes}
+              onUpdateNoteVelocity={updatePianoNoteVelocity}
               onSynthSettingsChange={setSynthSettings}
             />
           )}

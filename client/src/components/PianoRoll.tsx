@@ -89,6 +89,7 @@ interface PianoRollProps {
   onPreviewNote: (pitch: number) => void;
   onMoveNotes: (noteIds: Set<string>, stepDelta: number, pitchDelta: number) => void;
   onPasteNotes: (notes: Omit<PianoNote, 'id'>[]) => void;
+  onUpdateNoteVelocity: (noteId: string, velocity: number) => void;
   onSynthSettingsChange: (params: Partial<SynthSettings>) => void;
 }
 
@@ -104,6 +105,7 @@ function PianoRoll({
   onPreviewNote,
   onMoveNotes,
   onPasteNotes,
+  onUpdateNoteVelocity,
   onSynthSettingsChange,
 }: PianoRollProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -117,6 +119,7 @@ function PianoRoll({
   const boxSelectRef = useRef<BoxSelectState | null>(null);
   /** Clipboard: stores copied notes with positions relative to the selection origin */
   const clipboardRef = useRef<Omit<PianoNote, 'id'>[]>([]);
+  const velocityLaneRef = useRef<HTMLDivElement>(null);
 
   // Build a lookup: for each pitch, a sorted list of notes
   const notesByPitch = useRef<Map<number, PianoNote[]>>(new Map());
@@ -125,6 +128,15 @@ function PianoRoll({
     const list = notesByPitch.current.get(note.pitch) ?? [];
     list.push(note);
     notesByPitch.current.set(note.pitch, list);
+  }
+
+  // Build a lookup: for each step, the notes that start there (for velocity lane)
+  const notesByStep = useRef<Map<number, PianoNote[]>>(new Map());
+  notesByStep.current = new Map();
+  for (const note of pianoRoll.notes) {
+    const list = notesByStep.current.get(note.step) ?? [];
+    list.push(note);
+    notesByStep.current.set(note.step, list);
   }
 
   // Build a coverage map: "pitch-step" -> note (for cells covered by a note's duration)
@@ -592,6 +604,49 @@ function PianoRoll({
   // Pre-compute which note IDs are in the active box selection (for live preview)
   const boxPreviewIds = boxSelect ? getNotesInBox(boxSelect) : null;
 
+  /** Velocity lane: compute velocity from mouse Y position relative to the bar container */
+  const velocityFromMouseY = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    // Top = velocity 1, bottom = velocity 0.05
+    return Math.max(0.05, Math.min(1, 1 - y / rect.height));
+  }, []);
+
+  const velocityDragRef = useRef<boolean>(false);
+
+  const handleVelocityMouseDown = useCallback(
+    (step: number, e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const velocity = velocityFromMouseY(e);
+      const notes = notesByStep.current.get(step);
+      if (!notes || notes.length === 0) return;
+      velocityDragRef.current = true;
+      for (const note of notes) {
+        onUpdateNoteVelocity(note.id, velocity);
+      }
+    },
+    [onUpdateNoteVelocity, velocityFromMouseY],
+  );
+
+  const handleVelocityMouseEnter = useCallback(
+    (step: number, e: React.MouseEvent<HTMLDivElement>) => {
+      if (!velocityDragRef.current) return;
+      const velocity = velocityFromMouseY(e);
+      const notes = notesByStep.current.get(step);
+      if (!notes || notes.length === 0) return;
+      for (const note of notes) {
+        onUpdateNoteVelocity(note.id, velocity);
+      }
+    },
+    [onUpdateNoteVelocity, velocityFromMouseY],
+  );
+
+  useEffect(() => {
+    const onUp = () => { velocityDragRef.current = false; };
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, []);
+
   return (
     <div className="piano-roll">
       <div className="piano-roll-header">
@@ -1040,6 +1095,43 @@ function PianoRoll({
               </div>
             );
           })}
+        </div>
+
+        {/* Velocity lane */}
+        <div className="velocity-lane">
+          <div className="velocity-lane-label">VEL</div>
+          <div className="velocity-lane-bars" ref={velocityLaneRef}>
+            {Array.from({ length: stepCount }, (_, step) => {
+              const notes = notesByStep.current.get(step);
+              const hasNote = notes && notes.length > 0;
+              // Use the highest velocity among notes at this step
+              const velocity = hasNote
+                ? Math.max(...notes.map((n) => n.velocity))
+                : 0;
+              const isCurrent = isPlaying && currentStep === step;
+
+              return (
+                <div
+                  key={step}
+                  className={
+                    `velocity-lane-step` +
+                    (step % 4 === 0 ? ' beat-start' : '') +
+                    (isCurrent ? ' current' : '')
+                  }
+                  onMouseDown={(e) => handleVelocityMouseDown(step, e)}
+                  onMouseEnter={(e) => handleVelocityMouseEnter(step, e)}
+                >
+                  {hasNote && (
+                    <div
+                      className="velocity-bar"
+                      style={{ height: `${Math.round(velocity * 100)}%` }}
+                      title={`Velocity: ${Math.round(velocity * 100)}%`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
