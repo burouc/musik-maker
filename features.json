@@ -520,7 +520,7 @@
           "id": "au-03",
           "priority": "P0",
           "title": "Link automation to mixer volume, pan, effect params",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "au-04",

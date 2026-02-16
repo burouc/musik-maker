@@ -125,7 +125,7 @@ Features are grouped by category. Each item is marked with a priority:
 
 - [x] **[P0]** Automation lanes for any knob/parameter
 - [ ] **[P0]** Draw automation curves (point-and-click or freehand)
-- [ ] **[P0]** Link automation to mixer volume, pan, effect params
+- [x] **[P0]** Link automation to mixer volume, pan, effect params
 - [ ] **[P1]** Automation curve types (linear, smooth, stepped)
 - [ ] **[P1]** Copy/paste automation clips
 - [ ] **[P2]** LFO-based automation generator
