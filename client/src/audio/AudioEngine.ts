@@ -27,6 +27,59 @@ class AudioEngine {
     }
   }
 
+  /**
+   * Play a pitched piano note using a simple subtractive synth.
+   * @param midiNote  MIDI note number (60 = C4)
+   * @param volume    0–1
+   * @param duration  Duration in seconds
+   */
+  async playPianoNote(
+    midiNote: number,
+    volume: number,
+    duration: number = 0.2,
+  ): Promise<void> {
+    await this.resume();
+    const now = this.context.currentTime;
+    const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+
+    // Two detuned saw oscillators for a richer tone
+    const osc1 = this.context.createOscillator();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(freq, now);
+
+    const osc2 = this.context.createOscillator();
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(freq * 1.003, now); // slight detune
+
+    // Low-pass filter for warmth
+    const filter = this.context.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(Math.min(freq * 4, 12000), now);
+    filter.Q.setValueAtTime(1, now);
+
+    // ADSR-ish envelope
+    const gain = this.context.createGain();
+    const attack = 0.005;
+    const release = Math.min(0.15, duration * 0.3);
+    const sustain = volume * 0.35;
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(volume * 0.4, now + attack);
+    gain.gain.linearRampToValueAtTime(sustain, now + attack + 0.05);
+    gain.gain.setValueAtTime(sustain, now + duration - release);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + duration + 0.01);
+    osc2.stop(now + duration + 0.01);
+  }
+
   async playSound(instrument: InstrumentName, volume: number): Promise<void> {
     await this.resume();
 
