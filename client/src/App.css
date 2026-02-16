@@ -542,6 +542,65 @@
 }
 
 /* =========================================================================
+   View tabs
+   ========================================================================= */
+
+.view-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-secondary);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+
+.view-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.view-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.view-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.view-tab.active:hover {
+  background: var(--accent-hover);
+}
+
+.view-tab-shortcut {
+  font-size: 0.6rem;
+  font-family: var(--font-mono);
+  opacity: 0.5;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  line-height: 1;
+}
+
+.view-tab.active .view-tab-shortcut {
+  opacity: 0.7;
+}
+
+/* =========================================================================
    Step Sequencer grid
    ========================================================================= */
 

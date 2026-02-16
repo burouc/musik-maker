@@ -8,7 +8,15 @@ import PianoRoll from './components/PianoRoll';
 import Arrangement from './components/Arrangement';
 import AutomationLanes from './components/AutomationLanes';
 import ResizablePanel from './components/ResizablePanel';
+import type { ViewTab } from './types';
 import './App.css';
+
+const VIEW_TABS: { id: ViewTab; label: string; shortcut: string }[] = [
+  { id: 'channel-rack', label: 'Channel Rack', shortcut: '1' },
+  { id: 'piano-roll', label: 'Piano Roll', shortcut: '2' },
+  { id: 'mixer', label: 'Mixer', shortcut: '3' },
+  { id: 'arrangement', label: 'Arrangement', shortcut: '4' },
+];
 
 function App() {
   const {
@@ -96,6 +104,7 @@ function App() {
     setProjectName,
   } = useSequencer();
 
+  const [activeTab, setActiveTab] = useState<ViewTab>('channel-rack');
   const [saving, setSaving] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [savedProjects, setSavedProjects] = useState<{ id: string; name: string; updatedAt: string }[]>([]);
@@ -151,7 +160,7 @@ function App() {
     }
   }, [deleteServerProject]);
 
-  // Ctrl+S / Ctrl+N keyboard shortcuts
+  // Ctrl+S / Ctrl+N / tab switching (1-4) keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -161,6 +170,12 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault();
         handleNew();
+      }
+      // Tab switching with number keys (only when not typing in an input)
+      const tag = (e.target as HTMLElement).tagName;
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+        const tab = VIEW_TABS.find((t) => t.shortcut === e.key);
+        if (tab) setActiveTab(tab.id);
       }
     };
     window.addEventListener('keydown', handler);
@@ -253,124 +268,145 @@ function App() {
         onRenamePattern={renamePattern}
       />
 
-      <ResizablePanel defaultHeight={280} minHeight={100} maxHeight={800} className="panel-sequencer">
-        <StepSequencer
-          tracks={tracks}
-          sampleTracks={sampleTracks}
-          samples={state.samples}
-          stepCount={activePattern?.stepCount ?? 16}
-          currentStep={state.currentStep}
-          isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
-          onToggleStep={toggleStep}
-          onSetStepVelocity={setStepVelocity}
-          onSetStepPitch={setStepPitch}
-          onStepCountChange={setPatternStepCount}
-          onToggleSampleStep={toggleSampleStep}
-          onSetSampleStepVelocity={setSampleStepVelocity}
-          onSetSampleStepPitch={setSampleStepPitch}
-          onSetSampleTrackSample={setSampleTrackSample}
-          onSetSampleTrackPlaybackMode={setSampleTrackPlaybackMode}
-          onLoadSample={loadSample}
-          onPreviewSample={previewSample}
-          onStopPreview={stopPreview}
-          onAddSampleTrack={addSampleTrack}
-          onRemoveSampleTrack={removeSampleTrack}
-        />
-      </ResizablePanel>
+      <div className="view-tabs">
+        {VIEW_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={`view-tab${activeTab === tab.id ? ' active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+            <span className="view-tab-shortcut">{tab.shortcut}</span>
+          </button>
+        ))}
+      </div>
 
-      <ResizablePanel defaultHeight={340} minHeight={120} maxHeight={800} className="panel-mixer">
-        <Mixer
-        tracks={tracks}
-        sampleTracks={sampleTracks}
-        masterVolume={state.masterVolume}
-        masterReverb={state.masterReverb}
-        masterDelay={state.masterDelay}
-        masterFilter={state.masterFilter}
-        audioEngine={audioEngine}
-        onSetVolume={setTrackVolume}
-        onSetPan={setTrackPan}
-        onToggleMute={toggleMute}
-        onToggleSolo={toggleSolo}
-        onClearTrack={clearTrack}
-        onSetMasterVolume={setMasterVolume}
-        onSetReverbSend={setTrackReverbSend}
-        onSetMasterReverb={setMasterReverb}
-        onSetDelaySend={setTrackDelaySend}
-        onSetMasterDelay={setMasterDelay}
-        onSetFilterSend={setTrackFilterSend}
-        onSetMasterFilter={setMasterFilter}
-        onSetSampleVolume={setSampleTrackVolume}
-        onSetSamplePan={setSampleTrackPan}
-        onToggleSampleMute={toggleSampleMute}
-        onToggleSampleSolo={toggleSampleSolo}
-        onClearSampleTrack={clearSampleTrack}
-        onSetSampleReverbSend={setSampleTrackReverbSend}
-        onSetSampleDelaySend={setSampleTrackDelaySend}
-        onSetSampleFilterSend={setSampleTrackFilterSend}
-      />
-      </ResizablePanel>
+      {activeTab === 'channel-rack' && (
+        <ResizablePanel defaultHeight={280} minHeight={100} maxHeight={800} className="panel-sequencer" showDivider={false}>
+          <StepSequencer
+            tracks={tracks}
+            sampleTracks={sampleTracks}
+            samples={state.samples}
+            stepCount={activePattern?.stepCount ?? 16}
+            currentStep={state.currentStep}
+            isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
+            onToggleStep={toggleStep}
+            onSetStepVelocity={setStepVelocity}
+            onSetStepPitch={setStepPitch}
+            onStepCountChange={setPatternStepCount}
+            onToggleSampleStep={toggleSampleStep}
+            onSetSampleStepVelocity={setSampleStepVelocity}
+            onSetSampleStepPitch={setSampleStepPitch}
+            onSetSampleTrackSample={setSampleTrackSample}
+            onSetSampleTrackPlaybackMode={setSampleTrackPlaybackMode}
+            onLoadSample={loadSample}
+            onPreviewSample={previewSample}
+            onStopPreview={stopPreview}
+            onAddSampleTrack={addSampleTrack}
+            onRemoveSampleTrack={removeSampleTrack}
+          />
+        </ResizablePanel>
+      )}
 
-      <ResizablePanel defaultHeight={380} minHeight={120} maxHeight={800} className="panel-piano-roll">
-        {activePattern && (
-          <PianoRoll
-          pianoRoll={activePattern.pianoRoll}
-          stepCount={activePattern.stepCount}
-          currentStep={state.currentStep}
-          isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
-          synthSettings={activePattern.synthSettings}
-          onAddNote={addPianoNote}
-          onDeleteNote={deletePianoNote}
-          onUpdateNote={updatePianoNote}
-          onPreviewNote={previewPianoNote}
-          onMoveNotes={movePianoNotes}
-          onPasteNotes={pastePianoNotes}
-          onSynthSettingsChange={setSynthSettings}
-        />
-        )}
-      </ResizablePanel>
+      {activeTab === 'piano-roll' && (
+        <ResizablePanel defaultHeight={380} minHeight={120} maxHeight={800} className="panel-piano-roll" showDivider={false}>
+          {activePattern && (
+            <PianoRoll
+              pianoRoll={activePattern.pianoRoll}
+              stepCount={activePattern.stepCount}
+              currentStep={state.currentStep}
+              isPlaying={state.isPlaying && state.playbackMode === 'pattern'}
+              synthSettings={activePattern.synthSettings}
+              onAddNote={addPianoNote}
+              onDeleteNote={deletePianoNote}
+              onUpdateNote={updatePianoNote}
+              onPreviewNote={previewPianoNote}
+              onMoveNotes={movePianoNotes}
+              onPasteNotes={pastePianoNotes}
+              onSynthSettingsChange={setSynthSettings}
+            />
+          )}
+        </ResizablePanel>
+      )}
 
-      <ResizablePanel defaultHeight={400} minHeight={120} maxHeight={1000} className="panel-arrangement" showDivider={false}>
-        <Arrangement
-        patterns={state.patterns}
-        activePatternId={state.activePatternId}
-        arrangement={state.arrangement}
-        arrangementLength={state.arrangementLength}
-        playbackMode={state.playbackMode}
-        currentMeasure={state.currentMeasure}
-        isPlaying={state.isPlaying}
-        loopStart={state.loopStart}
-        loopEnd={state.loopEnd}
-        onToggleBlock={toggleArrangementBlock}
-        onPlaceBlock={placeArrangementBlock}
-        onResizeBlock={resizeArrangementBlock}
-        onMoveBlock={moveArrangementBlock}
-        onToggleTrackMute={toggleArrangementTrackMute}
-        onAddTrack={addArrangementTrack}
-        onRemoveTrack={removeArrangementTrack}
-        onSetLength={setArrangementLength}
-        onSetPlaybackMode={setPlaybackMode}
-        onSetLoopStart={setLoopStart}
-        onSetLoopEnd={setLoopEnd}
-        onClearLoop={clearLoopMarkers}
-      />
+      {activeTab === 'mixer' && (
+        <ResizablePanel defaultHeight={340} minHeight={120} maxHeight={800} className="panel-mixer" showDivider={false}>
+          <Mixer
+            tracks={tracks}
+            sampleTracks={sampleTracks}
+            masterVolume={state.masterVolume}
+            masterReverb={state.masterReverb}
+            masterDelay={state.masterDelay}
+            masterFilter={state.masterFilter}
+            audioEngine={audioEngine}
+            onSetVolume={setTrackVolume}
+            onSetPan={setTrackPan}
+            onToggleMute={toggleMute}
+            onToggleSolo={toggleSolo}
+            onClearTrack={clearTrack}
+            onSetMasterVolume={setMasterVolume}
+            onSetReverbSend={setTrackReverbSend}
+            onSetMasterReverb={setMasterReverb}
+            onSetDelaySend={setTrackDelaySend}
+            onSetMasterDelay={setMasterDelay}
+            onSetFilterSend={setTrackFilterSend}
+            onSetMasterFilter={setMasterFilter}
+            onSetSampleVolume={setSampleTrackVolume}
+            onSetSamplePan={setSampleTrackPan}
+            onToggleSampleMute={toggleSampleMute}
+            onToggleSampleSolo={toggleSampleSolo}
+            onClearSampleTrack={clearSampleTrack}
+            onSetSampleReverbSend={setSampleTrackReverbSend}
+            onSetSampleDelaySend={setSampleTrackDelaySend}
+            onSetSampleFilterSend={setSampleTrackFilterSend}
+          />
+        </ResizablePanel>
+      )}
 
-      <AutomationLanes
-        lanes={state.automationLanes}
-        arrangementLength={state.arrangementLength}
-        currentMeasure={state.currentMeasure}
-        currentStep={state.currentStep}
-        isPlaying={state.isPlaying}
-        playbackMode={state.playbackMode}
-        drumTracks={tracks}
-        sampleTracks={sampleTracks}
-        onAddLane={addAutomationLane}
-        onRemoveLane={removeAutomationLane}
-        onToggleLane={toggleAutomationLane}
-        onSetPoint={setAutomationPoint}
-        onRemovePoint={removeAutomationPoint}
-        onClearLane={clearAutomationLane}
-      />
-      </ResizablePanel>
+      {activeTab === 'arrangement' && (
+        <ResizablePanel defaultHeight={400} minHeight={120} maxHeight={1000} className="panel-arrangement" showDivider={false}>
+          <Arrangement
+            patterns={state.patterns}
+            activePatternId={state.activePatternId}
+            arrangement={state.arrangement}
+            arrangementLength={state.arrangementLength}
+            playbackMode={state.playbackMode}
+            currentMeasure={state.currentMeasure}
+            isPlaying={state.isPlaying}
+            loopStart={state.loopStart}
+            loopEnd={state.loopEnd}
+            onToggleBlock={toggleArrangementBlock}
+            onPlaceBlock={placeArrangementBlock}
+            onResizeBlock={resizeArrangementBlock}
+            onMoveBlock={moveArrangementBlock}
+            onToggleTrackMute={toggleArrangementTrackMute}
+            onAddTrack={addArrangementTrack}
+            onRemoveTrack={removeArrangementTrack}
+            onSetLength={setArrangementLength}
+            onSetPlaybackMode={setPlaybackMode}
+            onSetLoopStart={setLoopStart}
+            onSetLoopEnd={setLoopEnd}
+            onClearLoop={clearLoopMarkers}
+          />
+
+          <AutomationLanes
+            lanes={state.automationLanes}
+            arrangementLength={state.arrangementLength}
+            currentMeasure={state.currentMeasure}
+            currentStep={state.currentStep}
+            isPlaying={state.isPlaying}
+            playbackMode={state.playbackMode}
+            drumTracks={tracks}
+            sampleTracks={sampleTracks}
+            onAddLane={addAutomationLane}
+            onRemoveLane={removeAutomationLane}
+            onToggleLane={toggleAutomationLane}
+            onSetPoint={setAutomationPoint}
+            onRemovePoint={removeAutomationPoint}
+            onClearLane={clearAutomationLane}
+          />
+        </ResizablePanel>
+      )}
     </div>
   );
 }
