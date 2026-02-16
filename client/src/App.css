@@ -663,6 +663,52 @@
   text-align: center;
 }
 
+/* Step sequencer zoom controls */
+.step-zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-zoom-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-zoom-buttons {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.step-zoom-btn {
+  padding: 3px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.step-zoom-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.step-zoom-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .step-header,
 .step-row {
   display: flex;
@@ -709,8 +755,8 @@
 .step-cell {
   flex: 1;
   aspect-ratio: 1;
-  min-width: 28px;
-  max-width: 48px;
+  min-width: var(--step-min-width, 28px);
+  max-width: var(--step-max-width, 48px);
   border-radius: 4px;
   background: var(--step-off);
   border: 2px solid transparent;
@@ -2298,7 +2344,7 @@
   }
 
   .step-cell {
-    min-width: 20px;
+    min-width: var(--step-min-width, 20px);
   }
 
   .mixer {

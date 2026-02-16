@@ -1,6 +1,17 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import type { InstrumentName, Track, SampleTrack, SampleInstrument, SamplePlaybackMode } from '../types';
 import { ACCEPTED_SAMPLE_MIME_TYPES } from '../audio/AudioEngine';
+
+/** Zoom presets: label and corresponding min-width for step cells (px) */
+const ZOOM_LEVELS = [
+  { label: 'XS', minWidth: 16, maxWidth: 24 },
+  { label: 'S', minWidth: 22, maxWidth: 36 },
+  { label: 'M', minWidth: 28, maxWidth: 48 },
+  { label: 'L', minWidth: 40, maxWidth: 64 },
+  { label: 'XL', minWidth: 56, maxWidth: 80 },
+] as const;
+
+const DEFAULT_ZOOM_INDEX = 2; // 'M' — matches the existing min-width: 28px
 
 /** Steps at or below this velocity are rendered as ghost notes (visually dimmed) */
 const GHOST_NOTE_THRESHOLD = 0.5;
@@ -443,8 +454,19 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
   onAddSampleTrack,
   onRemoveSampleTrack,
 }) {
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
+
+  const zoomStyle = useMemo(
+    () =>
+      ({
+        '--step-min-width': `${ZOOM_LEVELS[zoomIndex].minWidth}px`,
+        '--step-max-width': `${ZOOM_LEVELS[zoomIndex].maxWidth}px`,
+      }) as React.CSSProperties,
+    [zoomIndex],
+  );
+
   return (
-    <div className="step-sequencer">
+    <div className="step-sequencer" style={zoomStyle}>
       <div className="step-sequencer-toolbar">
         <label className="step-count-label">
           Steps:
@@ -457,6 +479,21 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
             onChange={(e) => onStepCountChange(Number(e.target.value))}
           />
         </label>
+        <div className="step-zoom-control">
+          <span className="step-zoom-label">Zoom:</span>
+          <div className="step-zoom-buttons">
+            {ZOOM_LEVELS.map((level, i) => (
+              <button
+                key={level.label}
+                className={`step-zoom-btn${i === zoomIndex ? ' active' : ''}`}
+                onClick={() => setZoomIndex(i)}
+                title={`Zoom ${level.label}`}
+              >
+                {level.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="step-header">
         <div className="track-label" />
