@@ -123,7 +123,7 @@ Features are grouped by category. Each item is marked with a priority:
 
 ### 8. Automation
 
-- [ ] **[P0]** Automation lanes for any knob/parameter
+- [x] **[P0]** Automation lanes for any knob/parameter
 - [ ] **[P0]** Draw automation curves (point-and-click or freehand)
 - [ ] **[P0]** Link automation to mixer volume, pan, effect params
 - [ ] **[P1]** Automation curve types (linear, smooth, stepped)
