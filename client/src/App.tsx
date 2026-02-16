@@ -30,6 +30,7 @@ function App() {
     deletePianoNote,
     updatePianoNote,
     previewPianoNote,
+    movePianoNotes,
     toggleArrangementBlock,
     toggleArrangementTrackMute,
     addArrangementTrack,
@@ -95,6 +96,7 @@ function App() {
           onDeleteNote={deletePianoNote}
           onUpdateNote={updatePianoNote}
           onPreviewNote={previewPianoNote}
+          onMoveNotes={movePianoNotes}
         />
       )}
 

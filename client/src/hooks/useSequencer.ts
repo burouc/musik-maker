@@ -609,6 +609,29 @@ function useSequencer() {
     }));
   }, []);
 
+  const movePianoNotes = useCallback((noteIds: Set<string>, stepDelta: number, pitchDelta: number) => {
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        return {
+          ...pattern,
+          pianoRoll: {
+            notes: pattern.pianoRoll.notes.map((n) => {
+              if (!noteIds.has(n.id)) return n;
+              const newStep = n.step + stepDelta;
+              const newPitch = n.pitch + pitchDelta;
+              // Clamp: don't move out of bounds
+              if (newStep < 0 || newStep + n.duration > pattern.stepCount) return n;
+              if (newPitch < 36 || newPitch > 83) return n;
+              return { ...n, step: newStep, pitch: newPitch };
+            }),
+          },
+        };
+      }),
+    }));
+  }, []);
+
   const clearPianoRoll = useCallback(() => {
     setState((prev) => ({
       ...prev,
@@ -744,6 +767,7 @@ function useSequencer() {
     deletePianoNote,
     updatePianoNote,
     previewPianoNote,
+    movePianoNotes,
     clearPianoRoll,
     toggleArrangementBlock,
     toggleArrangementTrackMute,

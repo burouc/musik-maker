@@ -55,6 +55,18 @@ interface BoxSelectState {
   currentStep: number;
 }
 
+/** Move-drag state: tracks dragging selected notes to a new position */
+interface MoveState {
+  /** The pitch of the cell where the drag started */
+  startPitch: number;
+  /** The step of the cell where the drag started */
+  startStep: number;
+  /** Current pitch under the cursor */
+  currentPitch: number;
+  /** Current step under the cursor */
+  currentStep: number;
+}
+
 interface PianoRollProps {
   pianoRoll: PianoRollData;
   stepCount: number;
@@ -64,6 +76,7 @@ interface PianoRollProps {
   onDeleteNote: (noteId: string) => void;
   onUpdateNote: (noteId: string, updates: { step?: number; duration?: number }) => void;
   onPreviewNote: (pitch: number) => void;
+  onMoveNotes: (noteIds: Set<string>, stepDelta: number, pitchDelta: number) => void;
 }
 
 function PianoRoll({
@@ -75,12 +88,15 @@ function PianoRoll({
   onDeleteNote,
   onUpdateNote,
   onPreviewNote,
+  onMoveNotes,
 }: PianoRollProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const [resize, setResize] = useState<ResizeState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
+  const [move, setMove] = useState<MoveState | null>(null);
+  const moveRef = useRef<MoveState | null>(null);
   const [boxSelect, setBoxSelect] = useState<BoxSelectState | null>(null);
   const boxSelectRef = useRef<BoxSelectState | null>(null);
 
@@ -205,9 +221,27 @@ function PianoRoll({
             }
             return next;
           });
+        } else if (selectedNoteIds.has(coveredNote.id)) {
+          // Clicking an already-selected note: start move drag
+          const newMove: MoveState = {
+            startPitch: pitch,
+            startStep: step,
+            currentPitch: pitch,
+            currentStep: step,
+          };
+          moveRef.current = newMove;
+          setMove(newMove);
         } else {
-          // Plain click: select only this note
+          // Plain click on unselected note: select only this note, start move drag
           setSelectedNoteIds(new Set([coveredNote.id]));
+          const newMove: MoveState = {
+            startPitch: pitch,
+            startStep: step,
+            currentPitch: pitch,
+            currentStep: step,
+          };
+          moveRef.current = newMove;
+          setMove(newMove);
         }
         return;
       }
@@ -268,6 +302,13 @@ function PianoRoll({
         setBoxSelect(updated);
         return;
       }
+      // Handle move drag
+      if (moveRef.current) {
+        const updated = { ...moveRef.current, currentPitch: pitch, currentStep: step };
+        moveRef.current = updated;
+        setMove(updated);
+        return;
+      }
       // Handle resize drag
       if (resizeRef.current) {
         if (pitch !== resizeRef.current.pitch) return;
@@ -305,6 +346,19 @@ function PianoRoll({
       return;
     }
 
+    // Handle move completion
+    const m = moveRef.current;
+    if (m) {
+      const stepDelta = m.currentStep - m.startStep;
+      const pitchDelta = m.currentPitch - m.startPitch;
+      if (stepDelta !== 0 || pitchDelta !== 0) {
+        onMoveNotes(selectedNoteIds, stepDelta, pitchDelta);
+      }
+      moveRef.current = null;
+      setMove(null);
+      return;
+    }
+
     // Handle resize completion
     const r = resizeRef.current;
     if (r) {
@@ -337,12 +391,12 @@ function PianoRoll({
     onAddNote(d.pitch, minStep, duration);
     dragRef.current = null;
     setDrag(null);
-  }, [onAddNote, onUpdateNote]);
+  }, [onAddNote, onUpdateNote, onMoveNotes, selectedNoteIds]);
 
   // Global mouseup listener to catch releases outside the grid
   useEffect(() => {
     const onUp = () => {
-      if (dragRef.current || resizeRef.current || boxSelectRef.current) {
+      if (dragRef.current || resizeRef.current || boxSelectRef.current || moveRef.current) {
         handleMouseUp();
       }
     };
@@ -369,19 +423,30 @@ function PianoRoll({
         return;
       }
 
-      // Delete/Backspace: delete all selected notes
+      // All remaining shortcuts require a selection
       if (selectedNoteIds.size === 0) return;
+
+      // Delete/Backspace: delete all selected notes
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         for (const id of selectedNoteIds) {
           onDeleteNote(id);
         }
         setSelectedNoteIds(new Set());
+        return;
+      }
+
+      // Arrow keys: move selected notes
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const stepDelta = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+        const pitchDelta = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0;
+        onMoveNotes(selectedNoteIds, stepDelta, pitchDelta);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedNoteIds, onDeleteNote, pianoRoll.notes]);
+  }, [selectedNoteIds, onDeleteNote, onMoveNotes, pianoRoll.notes]);
 
   // Clear selected notes that no longer exist
   useEffect(() => {
@@ -418,6 +483,24 @@ function PianoRoll({
       const origEnd = resize.origStep + resize.origDuration - 1;
       resizePreviewStart = Math.min(resize.currentStep, origEnd);
       resizePreviewEnd = origEnd;
+    }
+  }
+
+  // Compute move preview: build a coverage map of where selected notes would land
+  const moveStepDelta = move ? move.currentStep - move.startStep : 0;
+  const movePitchDelta = move ? move.currentPitch - move.startPitch : 0;
+  const movePreviewCells = useRef<Map<string, PianoNote>>(new Map());
+  movePreviewCells.current = new Map();
+  if (move && (moveStepDelta !== 0 || movePitchDelta !== 0)) {
+    for (const note of pianoRoll.notes) {
+      if (!selectedNoteIds.has(note.id)) continue;
+      const newStep = note.step + moveStepDelta;
+      const newPitch = note.pitch + movePitchDelta;
+      for (let s = newStep; s < newStep + note.duration && s < stepCount; s++) {
+        if (s >= 0 && newPitch >= MIDI_LOW && newPitch <= MIDI_HIGH) {
+          movePreviewCells.current.set(`${newPitch}-${s}`, { ...note, step: newStep, pitch: newPitch });
+        }
+      }
     }
   }
 
@@ -500,6 +583,13 @@ function PianoRoll({
                     const hideForResize = isResizing && !isResizePreview;
                     const showAsResizeActive = isResizePreview && !isResizing;
 
+                    // Move preview: hide selected notes at original position, show at preview position
+                    const isMoving = move && (moveStepDelta !== 0 || movePitchDelta !== 0);
+                    const hideForMove = isMoving && isCovered && coveredNote && selectedNoteIds.has(coveredNote.id);
+                    const movePreview = movePreviewCells.current.get(`${midi}-${step}`);
+                    const isMovePreview = isMoving && !!movePreview;
+                    const isMovePreviewStart = isMovePreview && movePreview && step === movePreview.step;
+
                     // Determine if this cell is a resize handle (left or right edge of a note)
                     const isLeftEdge = isNoteStart && isCovered;
                     const isRightEdge = isCovered && coveredNote && step === coveredNote.step + coveredNote.duration - 1;
@@ -518,9 +608,11 @@ function PianoRoll({
                         key={step}
                         className={
                           `piano-roll-cell` +
-                          (isNoteStart && !hideForResize ? ' active note-start' : '') +
-                          (isContinuation && !hideForResize ? ' active note-continuation' : '') +
-                          (isSelected && !hideForResize ? ' selected' : '') +
+                          (isNoteStart && !hideForResize && !hideForMove ? ' active note-start' : '') +
+                          (isContinuation && !hideForResize && !hideForMove ? ' active note-continuation' : '') +
+                          (isSelected && !hideForResize && !hideForMove ? ' selected' : '') +
+                          (isMovePreview ? ' active move-preview selected' : '') +
+                          (isMovePreviewStart ? ' note-start' : '') +
                           (isCurrent ? ' current' : '') +
                           (step % 4 === 0 ? ' beat-start' : '') +
                           (isDragPreview && !isCovered ? ' drag-preview' : '') +
@@ -528,8 +620,8 @@ function PianoRoll({
                           (showAsResizeActive ? ' active resize-preview' : '') +
                           (isResizeStart && showAsResizeActive ? ' note-start' : '') +
                           (isResizePreview && isResizing ? ' resize-preview' : '') +
-                          (isLeftEdge && !resize ? ' note-edge-left' : '') +
-                          (isRightEdge && !resize ? ' note-edge-right' : '') +
+                          (isLeftEdge && !resize && !hideForMove ? ' note-edge-left' : '') +
+                          (isRightEdge && !resize && !hideForMove ? ' note-edge-right' : '') +
                           (isBoxSelectArea && !isCovered ? ' box-select-area' : '')
                         }
                         onMouseDown={(e) => handleCellMouseDown(midi, step, e)}
@@ -537,10 +629,16 @@ function PianoRoll({
                         onMouseUp={handleMouseUp}
                         onContextMenu={(e) => handleCellContextMenu(midi, step, e)}
                       >
-                        {isNoteStart && noteStart!.duration > 1 && !hideForResize && (
+                        {isNoteStart && noteStart!.duration > 1 && !hideForResize && !hideForMove && (
                           <div
                             className="piano-note-bar"
                             style={{ width: `calc(${noteStart!.duration * 100}% + ${(noteStart!.duration - 1) * 2}px)` }}
+                          />
+                        )}
+                        {isMovePreviewStart && movePreview && movePreview.duration > 1 && (
+                          <div
+                            className="piano-note-bar"
+                            style={{ width: `calc(${movePreview.duration * 100}% + ${(movePreview.duration - 1) * 2}px)` }}
                           />
                         )}
                         {isResizeStart && resizePreviewEnd - resizePreviewStart >= 0 && (
