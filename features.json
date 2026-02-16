@@ -640,7 +640,7 @@
           "id": "fm-01",
           "priority": "P0",
           "title": "Save project to server (persist all patterns, arrangement, mixer state)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "fm-02",
