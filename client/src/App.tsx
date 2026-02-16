@@ -5,6 +5,7 @@ import Mixer from './components/Mixer';
 import PatternSelector from './components/PatternSelector';
 import PianoRoll from './components/PianoRoll';
 import Arrangement from './components/Arrangement';
+import AutomationLanes from './components/AutomationLanes';
 import './App.css';
 
 function App() {
@@ -76,6 +77,13 @@ function App() {
     setSampleTrackReverbSend,
     setSampleTrackDelaySend,
     setSampleTrackFilterSend,
+    // Automation
+    addAutomationLane,
+    removeAutomationLane,
+    toggleAutomationLane,
+    setAutomationPoint,
+    removeAutomationPoint,
+    clearAutomationLane,
   } = useSequencer();
 
   return (
@@ -196,6 +204,21 @@ function App() {
         onSetLoopStart={setLoopStart}
         onSetLoopEnd={setLoopEnd}
         onClearLoop={clearLoopMarkers}
+      />
+
+      <AutomationLanes
+        lanes={state.automationLanes}
+        arrangementLength={state.arrangementLength}
+        currentMeasure={state.currentMeasure}
+        currentStep={state.currentStep}
+        isPlaying={state.isPlaying}
+        playbackMode={state.playbackMode}
+        onAddLane={addAutomationLane}
+        onRemoveLane={removeAutomationLane}
+        onToggleLane={toggleAutomationLane}
+        onSetPoint={setAutomationPoint}
+        onRemovePoint={removeAutomationPoint}
+        onClearLane={clearAutomationLane}
       />
     </div>
   );

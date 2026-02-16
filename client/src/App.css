@@ -1693,6 +1693,173 @@
 }
 
 /* =========================================================================
+   Automation Lanes
+   ========================================================================= */
+
+.automation-lanes {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.automation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.automation-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.automation-title:hover {
+  color: var(--text-primary);
+}
+
+.automation-add-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.automation-target-select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.automation-target-select:focus {
+  border-color: #4ecdc4;
+  outline: none;
+}
+
+.automation-add-btn {
+  padding: 5px 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 4px;
+  background: transparent;
+  color: #4ecdc4;
+  border: 1px dashed #4ecdc4;
+  transition: background 0.15s, color 0.15s;
+}
+
+.automation-add-btn:hover {
+  background: rgba(78, 205, 196, 0.15);
+}
+
+.automation-lane-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 8px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.automation-lane-row.disabled {
+  opacity: 0.5;
+}
+
+.automation-lane-label {
+  width: 110px;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px;
+  font-size: 0.7rem;
+}
+
+.automation-lane-name {
+  color: #4ecdc4;
+  font-weight: 600;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 94px;
+}
+
+.automation-enable-btn {
+  width: 32px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+
+.automation-enable-btn:hover {
+  color: var(--text-primary);
+}
+
+.automation-enable-btn.active {
+  background: #4ecdc4;
+  color: #1a1a2e;
+}
+
+.automation-lane-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.automation-clear-btn,
+.automation-remove-btn {
+  width: 28px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.automation-clear-btn:hover {
+  color: var(--text-primary);
+}
+
+.automation-remove-btn:hover {
+  color: var(--accent);
+}
+
+.automation-lane-canvas-wrapper {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.automation-lane-canvas {
+  display: block;
+  cursor: crosshair;
+  border-left: 1px solid var(--border);
+}
+
+/* =========================================================================
    Responsive
    ========================================================================= */
 

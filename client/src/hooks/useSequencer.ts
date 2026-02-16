@@ -15,6 +15,9 @@ import type {
   DelaySettings,
   FilterSettings,
   SynthSettings,
+  AutomationLane,
+  AutomationPoint,
+  AutomationTarget,
 } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
@@ -112,6 +115,7 @@ const INITIAL_STATE: SequencerState = {
   masterFilter: { send: 0, type: 'lowpass' as const, cutoff: 2000, resonance: 1 },
   loopStart: null,
   loopEnd: null,
+  automationLanes: [],
 };
 
 function useSequencer() {
@@ -124,6 +128,76 @@ function useSequencer() {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Helper: interpolate automation value at a given position
+  const getAutomationValue = useCallback(
+    (points: AutomationPoint[], measure: number, step: number): number | null => {
+      if (points.length === 0) return null;
+      // Position as a single number for comparison
+      const pos = measure * 1000 + step;
+      // Find surrounding points
+      let before: AutomationPoint | null = null;
+      let after: AutomationPoint | null = null;
+      for (const p of points) {
+        const pPos = p.measure * 1000 + p.step;
+        if (pPos <= pos) before = p;
+        if (pPos >= pos && after === null) after = p;
+      }
+      if (before === null && after === null) return null;
+      if (before === null) return after!.value;
+      if (after === null) return before.value;
+      if (before === after) return before.value;
+      // Linear interpolation
+      const bPos = before.measure * 1000 + before.step;
+      const aPos = after.measure * 1000 + after.step;
+      const t = (pos - bPos) / (aPos - bPos);
+      return before.value + (after.value - before.value) * t;
+    },
+    [],
+  );
+
+  // Helper: apply automation value to the audio engine
+  const applyAutomation = useCallback(
+    (target: AutomationTarget, normalizedValue: number) => {
+      switch (target) {
+        case 'masterVolume':
+          audioEngine.current.setMasterVolume(normalizedValue);
+          break;
+        case 'masterFilterCutoff': {
+          // Map 0–1 to 20–20000 Hz (exponential)
+          const cutoff = 20 * Math.pow(1000, normalizedValue);
+          audioEngine.current.setFilterParams({ cutoff });
+          break;
+        }
+        case 'masterFilterResonance': {
+          // Map 0–1 to 0.1–25
+          const resonance = 0.1 + normalizedValue * 24.9;
+          audioEngine.current.setFilterParams({ resonance });
+          break;
+        }
+        case 'masterReverbDecay': {
+          // Map 0–1 to 0.1–10
+          const decay = 0.1 + normalizedValue * 9.9;
+          audioEngine.current.setReverbParams({ decay });
+          break;
+        }
+        case 'masterReverbDamping': {
+          audioEngine.current.setReverbParams({ damping: normalizedValue });
+          break;
+        }
+        case 'masterDelayFeedback': {
+          // Map 0–1 to 0–0.9
+          audioEngine.current.setDelayParams({ feedback: normalizedValue * 0.9 });
+          break;
+        }
+        case 'masterDelayMix': {
+          audioEngine.current.setDelayParams({ mix: normalizedValue });
+          break;
+        }
+      }
+    },
+    [],
+  );
 
   // Helper: get the currently active pattern from state
   const getActivePattern = useCallback(
@@ -286,6 +360,15 @@ function useSequencer() {
                     }
                   }
                 }
+              }
+            }
+
+            // Apply automation lanes
+            for (const lane of current.automationLanes) {
+              if (!lane.enabled || lane.points.length === 0) continue;
+              const val = getAutomationValue(lane.points, nextMeasure, nextStep);
+              if (val !== null) {
+                applyAutomation(lane.target, val);
               }
             }
 
@@ -1486,6 +1569,104 @@ function useSequencer() {
     }));
   }, []);
 
+  // -----------------------------------------------------------------------
+  // Automation actions
+  // -----------------------------------------------------------------------
+
+  /** Parameter display names */
+  const AUTOMATION_TARGET_NAMES: Record<AutomationTarget, string> = {
+    masterVolume: 'Master Volume',
+    masterFilterCutoff: 'Filter Cutoff',
+    masterFilterResonance: 'Filter Resonance',
+    masterReverbDecay: 'Reverb Decay',
+    masterReverbDamping: 'Reverb Damping',
+    masterDelayFeedback: 'Delay Feedback',
+    masterDelayMix: 'Delay Mix',
+  };
+
+  const addAutomationLane = useCallback((target: AutomationTarget) => {
+    setState((prev) => {
+      // Don't add duplicate lanes for the same target
+      if (prev.automationLanes.some((l) => l.target === target)) return prev;
+      const lane: AutomationLane = {
+        id: `auto-${Date.now()}-${target}`,
+        target,
+        name: AUTOMATION_TARGET_NAMES[target],
+        points: [],
+        enabled: true,
+      };
+      return {
+        ...prev,
+        automationLanes: [...prev.automationLanes, lane],
+      };
+    });
+  }, []);
+
+  const removeAutomationLane = useCallback((laneId: string) => {
+    setState((prev) => ({
+      ...prev,
+      automationLanes: prev.automationLanes.filter((l) => l.id !== laneId),
+    }));
+  }, []);
+
+  const toggleAutomationLane = useCallback((laneId: string) => {
+    setState((prev) => ({
+      ...prev,
+      automationLanes: prev.automationLanes.map((l) =>
+        l.id === laneId ? { ...l, enabled: !l.enabled } : l,
+      ),
+    }));
+  }, []);
+
+  const setAutomationPoint = useCallback(
+    (laneId: string, measure: number, step: number, value: number) => {
+      const clamped = Math.max(0, Math.min(1, value));
+      setState((prev) => ({
+        ...prev,
+        automationLanes: prev.automationLanes.map((lane) => {
+          if (lane.id !== laneId) return lane;
+          // Remove existing point at same position, add new one
+          const filtered = lane.points.filter(
+            (p) => !(p.measure === measure && p.step === step),
+          );
+          const newPoint: AutomationPoint = { measure, step, value: clamped };
+          const points = [...filtered, newPoint].sort(
+            (a, b) => a.measure - b.measure || a.step - b.step,
+          );
+          return { ...lane, points };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const removeAutomationPoint = useCallback(
+    (laneId: string, measure: number, step: number) => {
+      setState((prev) => ({
+        ...prev,
+        automationLanes: prev.automationLanes.map((lane) => {
+          if (lane.id !== laneId) return lane;
+          return {
+            ...lane,
+            points: lane.points.filter(
+              (p) => !(p.measure === measure && p.step === step),
+            ),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const clearAutomationLane = useCallback((laneId: string) => {
+    setState((prev) => ({
+      ...prev,
+      automationLanes: prev.automationLanes.map((l) =>
+        l.id === laneId ? { ...l, points: [] } : l,
+      ),
+    }));
+  }, []);
+
   const setSynthSettings = useCallback((params: Partial<SynthSettings>) => {
     setState((prev) => ({
       ...prev,
@@ -1573,6 +1754,13 @@ function useSequencer() {
     setSampleTrackReverbSend,
     setSampleTrackDelaySend,
     setSampleTrackFilterSend,
+    // Automation
+    addAutomationLane,
+    removeAutomationLane,
+    toggleAutomationLane,
+    setAutomationPoint,
+    removeAutomationPoint,
+    clearAutomationLane,
   };
 }
 

@@ -508,7 +508,7 @@
           "id": "au-01",
           "priority": "P0",
           "title": "Automation lanes for any knob/parameter",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "au-02",

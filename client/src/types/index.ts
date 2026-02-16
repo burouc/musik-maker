@@ -225,6 +225,39 @@ export interface SampleTrack {
   filterSend: number;
 }
 
+/** Automatable parameter targets */
+export type AutomationTarget =
+  | 'masterVolume'
+  | 'masterFilterCutoff'
+  | 'masterFilterResonance'
+  | 'masterReverbDecay'
+  | 'masterReverbDamping'
+  | 'masterDelayFeedback'
+  | 'masterDelayMix';
+
+/** A single automation breakpoint */
+export interface AutomationPoint {
+  /** Measure index (0-based) */
+  measure: number;
+  /** Step within the measure (0-based, 0–15 for 16-step measures) */
+  step: number;
+  /** Normalized value 0–1 */
+  value: number;
+}
+
+/** An automation lane controlling a single parameter */
+export interface AutomationLane {
+  id: string;
+  /** Which parameter this lane automates */
+  target: AutomationTarget;
+  /** Display name */
+  name: string;
+  /** Breakpoints sorted by (measure, step) */
+  points: AutomationPoint[];
+  /** Whether this lane is actively applied during playback */
+  enabled: boolean;
+}
+
 export type PlaybackMode = 'pattern' | 'song';
 
 export interface SequencerState {
@@ -253,4 +286,6 @@ export interface SequencerState {
   loopStart: number | null;
   /** Loop end measure (0-based, exclusive) — null means no loop */
   loopEnd: number | null;
+  /** Automation lanes for parameter control over time */
+  automationLanes: AutomationLane[];
 }
