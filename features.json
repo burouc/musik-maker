@@ -706,7 +706,7 @@
           "id": "ui-01",
           "priority": "P0",
           "title": "Resizable panels (drag dividers between sequencer, piano roll, mixer, arrangement)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "ui-02",
