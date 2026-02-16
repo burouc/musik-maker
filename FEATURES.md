@@ -44,7 +44,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [ ] **[P0]** Note selection (click, shift-click, box select)
 - [ ] **[P0]** Move selected notes (drag, arrow keys)
 - [x] **[P0]** Copy/paste/duplicate notes
-- [ ] **[P1]** Velocity lane below the piano roll grid
+- [x] **[P1]** Velocity lane below the piano roll grid
 - [ ] **[P1]** Snap-to-grid with configurable grid resolution (1/4, 1/8, 1/16, 1/32, triplets)
 - [ ] **[P1]** Zoom in/out (horizontal and vertical)
 - [ ] **[P1]** Scroll/pan with middle-click or scroll wheel
