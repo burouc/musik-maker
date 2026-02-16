@@ -47,6 +47,14 @@ interface ResizeState {
   currentStep: number;
 }
 
+/** Box-select state: tracks a rectangular selection region on the grid */
+interface BoxSelectState {
+  startPitch: number;
+  startStep: number;
+  currentPitch: number;
+  currentStep: number;
+}
+
 interface PianoRollProps {
   pianoRoll: PianoRollData;
   stepCount: number;
@@ -72,7 +80,9 @@ function PianoRoll({
   const dragRef = useRef<DragState | null>(null);
   const [resize, setResize] = useState<ResizeState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
+  const [boxSelect, setBoxSelect] = useState<BoxSelectState | null>(null);
+  const boxSelectRef = useRef<BoxSelectState | null>(null);
 
   // Build a lookup: for each pitch, a sorted list of notes
   const notesByPitch = useRef<Map<number, PianoNote[]>>(new Map());
@@ -129,6 +139,29 @@ function PianoRoll({
     return null;
   }
 
+  /** Find all notes that overlap with a rectangular region (step range x pitch range) */
+  function getNotesInBox(box: BoxSelectState): Set<string> {
+    const minStep = Math.min(box.startStep, box.currentStep);
+    const maxStep = Math.max(box.startStep, box.currentStep);
+    const minPitch = Math.min(box.startPitch, box.currentPitch);
+    const maxPitch = Math.max(box.startPitch, box.currentPitch);
+
+    const ids = new Set<string>();
+    for (const note of pianoRoll.notes) {
+      const noteEnd = note.step + note.duration - 1;
+      // Note overlaps box if pitch is in range and step ranges overlap
+      if (
+        note.pitch >= minPitch &&
+        note.pitch <= maxPitch &&
+        noteEnd >= minStep &&
+        note.step <= maxStep
+      ) {
+        ids.add(note.id);
+      }
+    }
+    return ids;
+  }
+
   const handleCellMouseDown = useCallback(
     (pitch: number, step: number, e: React.MouseEvent) => {
       e.preventDefault();
@@ -136,7 +169,15 @@ function PianoRoll({
       // Check for resize edge first
       const edgeHit = detectEdge(e, pitch, step);
       if (edgeHit) {
-        setSelectedNoteId(edgeHit.note.id);
+        if (!e.shiftKey) {
+          setSelectedNoteIds(new Set([edgeHit.note.id]));
+        } else {
+          setSelectedNoteIds((prev) => {
+            const next = new Set(prev);
+            next.add(edgeHit.note.id);
+            return next;
+          });
+        }
         const newResize: ResizeState = {
           noteId: edgeHit.note.id,
           pitch: edgeHit.note.pitch,
@@ -153,13 +194,43 @@ function PianoRoll({
       // Check if there's an existing note covering this cell
       const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
       if (coveredNote) {
-        // Select the note (right-click or Delete key to delete)
-        setSelectedNoteId(coveredNote.id);
+        if (e.shiftKey) {
+          // Shift-click: toggle note in/out of selection
+          setSelectedNoteIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(coveredNote.id)) {
+              next.delete(coveredNote.id);
+            } else {
+              next.add(coveredNote.id);
+            }
+            return next;
+          });
+        } else {
+          // Plain click: select only this note
+          setSelectedNoteIds(new Set([coveredNote.id]));
+        }
         return;
       }
-      // Clicking empty space clears selection
-      setSelectedNoteId(null);
-      // Start drawing a new note
+
+      // Empty space clicked
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl/Cmd + drag on empty space: start box select
+        if (!e.shiftKey) {
+          setSelectedNoteIds(new Set());
+        }
+        const newBox: BoxSelectState = {
+          startPitch: pitch,
+          startStep: step,
+          currentPitch: pitch,
+          currentStep: step,
+        };
+        boxSelectRef.current = newBox;
+        setBoxSelect(newBox);
+        return;
+      }
+
+      // Clicking empty space without modifier clears selection and starts note draw
+      setSelectedNoteIds(new Set());
       onPreviewNote(pitch);
       const newDrag: DragState = { pitch, startStep: step, currentStep: step };
       dragRef.current = newDrag;
@@ -174,17 +245,29 @@ function PianoRoll({
       e.preventDefault();
       const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
       if (coveredNote) {
-        if (selectedNoteId === coveredNote.id) {
-          setSelectedNoteId(null);
+        // If the right-clicked note is selected, delete all selected notes
+        if (selectedNoteIds.has(coveredNote.id)) {
+          for (const id of selectedNoteIds) {
+            onDeleteNote(id);
+          }
+          setSelectedNoteIds(new Set());
+        } else {
+          onDeleteNote(coveredNote.id);
         }
-        onDeleteNote(coveredNote.id);
       }
     },
-    [onDeleteNote, selectedNoteId],
+    [onDeleteNote, selectedNoteIds],
   );
 
   const handleCellMouseEnter = useCallback(
     (pitch: number, step: number) => {
+      // Handle box select drag
+      if (boxSelectRef.current) {
+        const updated = { ...boxSelectRef.current, currentPitch: pitch, currentStep: step };
+        boxSelectRef.current = updated;
+        setBoxSelect(updated);
+        return;
+      }
       // Handle resize drag
       if (resizeRef.current) {
         if (pitch !== resizeRef.current.pitch) return;
@@ -205,6 +288,23 @@ function PianoRoll({
   );
 
   const handleMouseUp = useCallback(() => {
+    // Handle box select completion
+    const b = boxSelectRef.current;
+    if (b) {
+      const ids = getNotesInBox(b);
+      setSelectedNoteIds((prev) => {
+        // If shift was held at start, merge with existing selection
+        const next = new Set(prev);
+        for (const id of ids) {
+          next.add(id);
+        }
+        return next;
+      });
+      boxSelectRef.current = null;
+      setBoxSelect(null);
+      return;
+    }
+
     // Handle resize completion
     const r = resizeRef.current;
     if (r) {
@@ -242,7 +342,7 @@ function PianoRoll({
   // Global mouseup listener to catch releases outside the grid
   useEffect(() => {
     const onUp = () => {
-      if (dragRef.current || resizeRef.current) {
+      if (dragRef.current || resizeRef.current || boxSelectRef.current) {
         handleMouseUp();
       }
     };
@@ -250,26 +350,56 @@ function PianoRoll({
     return () => window.removeEventListener('mouseup', onUp);
   }, [handleMouseUp]);
 
-  // Delete/Backspace key handler for selected notes
+  // Keyboard handler: Delete/Backspace, Escape, Ctrl+A
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!selectedNoteId) return;
+      // Ctrl+A / Cmd+A: select all notes
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        setSelectedNoteIds(new Set(pianoRoll.notes.map((n) => n.id)));
+        return;
+      }
+
+      // Escape: clear selection
+      if (e.key === 'Escape') {
+        if (selectedNoteIds.size > 0) {
+          e.preventDefault();
+          setSelectedNoteIds(new Set());
+        }
+        return;
+      }
+
+      // Delete/Backspace: delete all selected notes
+      if (selectedNoteIds.size === 0) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        onDeleteNote(selectedNoteId);
-        setSelectedNoteId(null);
+        for (const id of selectedNoteIds) {
+          onDeleteNote(id);
+        }
+        setSelectedNoteIds(new Set());
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedNoteId, onDeleteNote]);
+  }, [selectedNoteIds, onDeleteNote, pianoRoll.notes]);
 
-  // Clear selection if the selected note no longer exists
+  // Clear selected notes that no longer exist
   useEffect(() => {
-    if (selectedNoteId && !pianoRoll.notes.some((n) => n.id === selectedNoteId)) {
-      setSelectedNoteId(null);
+    if (selectedNoteIds.size === 0) return;
+    const existingIds = new Set(pianoRoll.notes.map((n) => n.id));
+    const filtered = new Set<string>();
+    let changed = false;
+    for (const id of selectedNoteIds) {
+      if (existingIds.has(id)) {
+        filtered.add(id);
+      } else {
+        changed = true;
+      }
     }
-  }, [pianoRoll.notes, selectedNoteId]);
+    if (changed) {
+      setSelectedNoteIds(filtered);
+    }
+  }, [pianoRoll.notes, selectedNoteIds]);
 
   // Compute drag preview range
   const dragMin = drag ? Math.min(drag.startStep, drag.currentStep) : -1;
@@ -291,10 +421,24 @@ function PianoRoll({
     }
   }
 
+  // Compute box-select bounds
+  const boxMinStep = boxSelect ? Math.min(boxSelect.startStep, boxSelect.currentStep) : -1;
+  const boxMaxStep = boxSelect ? Math.max(boxSelect.startStep, boxSelect.currentStep) : -1;
+  const boxMinPitch = boxSelect ? Math.min(boxSelect.startPitch, boxSelect.currentPitch) : -1;
+  const boxMaxPitch = boxSelect ? Math.max(boxSelect.startPitch, boxSelect.currentPitch) : -1;
+
+  // Pre-compute which note IDs are in the active box selection (for live preview)
+  const boxPreviewIds = boxSelect ? getNotesInBox(boxSelect) : null;
+
   return (
     <div className="piano-roll">
       <div className="piano-roll-header">
         <div className="piano-roll-title">Piano Roll</div>
+        {selectedNoteIds.size > 0 && (
+          <div className="piano-roll-selection-count">
+            {selectedNoteIds.size} selected
+          </div>
+        )}
       </div>
 
       <div className="piano-roll-body">
@@ -359,7 +503,15 @@ function PianoRoll({
                     // Determine if this cell is a resize handle (left or right edge of a note)
                     const isLeftEdge = isNoteStart && isCovered;
                     const isRightEdge = isCovered && coveredNote && step === coveredNote.step + coveredNote.duration - 1;
-                    const isSelected = isCovered && coveredNote && coveredNote.id === selectedNoteId;
+                    const isSelected = isCovered && coveredNote && (
+                      selectedNoteIds.has(coveredNote.id) ||
+                      (boxPreviewIds !== null && boxPreviewIds.has(coveredNote.id))
+                    );
+
+                    // Box select overlay (highlight the rectangular region)
+                    const isBoxSelectArea = boxSelect &&
+                      midi >= boxMinPitch && midi <= boxMaxPitch &&
+                      step >= boxMinStep && step <= boxMaxStep;
 
                     return (
                       <div
@@ -377,7 +529,8 @@ function PianoRoll({
                           (isResizeStart && showAsResizeActive ? ' note-start' : '') +
                           (isResizePreview && isResizing ? ' resize-preview' : '') +
                           (isLeftEdge && !resize ? ' note-edge-left' : '') +
-                          (isRightEdge && !resize ? ' note-edge-right' : '')
+                          (isRightEdge && !resize ? ' note-edge-right' : '') +
+                          (isBoxSelectArea && !isCovered ? ' box-select-area' : '')
                         }
                         onMouseDown={(e) => handleCellMouseDown(midi, step, e)}
                         onMouseEnter={() => handleCellMouseEnter(midi, step)}
