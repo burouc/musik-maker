@@ -43,6 +43,8 @@ function App() {
     setMasterVolume,
     setTrackReverbSend,
     setMasterReverb,
+    setTrackDelaySend,
+    setMasterDelay,
     activePattern,
     audioEngine,
   } = useSequencer();
@@ -88,6 +90,7 @@ function App() {
         tracks={tracks}
         masterVolume={state.masterVolume}
         masterReverb={state.masterReverb}
+        masterDelay={state.masterDelay}
         audioEngine={audioEngine}
         onSetVolume={setTrackVolume}
         onSetPan={setTrackPan}
@@ -97,6 +100,8 @@ function App() {
         onSetMasterVolume={setMasterVolume}
         onSetReverbSend={setTrackReverbSend}
         onSetMasterReverb={setMasterReverb}
+        onSetDelaySend={setTrackDelaySend}
+        onSetMasterDelay={setMasterDelay}
       />
 
       {activePattern && (

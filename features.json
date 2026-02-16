@@ -238,7 +238,7 @@
           "id": "fx-02",
           "priority": "P0",
           "title": "Delay (tempo-synced, with feedback and mix controls)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "fx-03",

@@ -593,6 +593,86 @@
   color: var(--text-secondary);
 }
 
+/* Per-channel delay send */
+.mixer-delay-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.mixer-delay-slider {
+  width: 60px;
+  accent-color: #3b82f6;
+}
+
+.mixer-delay-display {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+/* Master delay channel */
+.mixer-delay-channel {
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
+  padding-left: 12px;
+  background: var(--bg-secondary);
+  min-width: 120px;
+}
+
+.mixer-delay-title {
+  color: #3b82f6 !important;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.mixer-delay-params {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.mixer-delay-param {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.mixer-delay-param label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.mixer-delay-param input[type='range'] {
+  width: 80px;
+  accent-color: #3b82f6;
+  height: 4px;
+}
+
+.mixer-delay-param span {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.mixer-delay-sync-select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
 /* VU meter + volume slider side by side */
 .mixer-meter-and-slider {
   display: flex;

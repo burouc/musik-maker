@@ -9,6 +9,7 @@ import type {
   SequencerState,
   PianoNote,
   ReverbSettings,
+  DelaySettings,
 } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
@@ -29,12 +30,12 @@ const DEFAULT_VELOCITY = 0.8;
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
-    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
-    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
-    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
-    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0 },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0 },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0 },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0 },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0 },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0 },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0 },
   ];
 }
 
@@ -74,6 +75,7 @@ const INITIAL_STATE: SequencerState = {
   currentMeasure: -1,
   masterVolume: 0.8,
   masterReverb: { send: 0, decay: 2, preDelay: 0.01, damping: 0.3 },
+  masterDelay: { send: 0, sync: '1/8' as const, feedback: 0.4, mix: 0.7 },
 };
 
 function useSequencer() {
@@ -407,10 +409,11 @@ function useSequencer() {
   }, []);
 
   const setBpm = useCallback((bpm: number) => {
-    setState((prev) => ({
-      ...prev,
-      bpm: Math.max(40, Math.min(300, bpm)),
-    }));
+    const clamped = Math.max(40, Math.min(300, bpm));
+    setState((prev) => {
+      audioEngine.current.setDelayBpm(clamped, prev.masterDelay.sync);
+      return { ...prev, bpm: clamped };
+    });
   }, []);
 
   const setTrackVolume = useCallback(
@@ -827,6 +830,37 @@ function useSequencer() {
     }));
   }, []);
 
+  const setTrackDelaySend = useCallback(
+    (trackId: InstrumentName, send: number) => {
+      const clamped = Math.max(0, Math.min(1, send));
+      audioEngine.current.setChannelDelaySend(trackId, clamped);
+      setState((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((pattern) =>
+          pattern.id === prev.activePatternId
+            ? {
+                ...pattern,
+                tracks: pattern.tracks.map((track) =>
+                  track.id === trackId
+                    ? { ...track, delaySend: clamped }
+                    : track,
+                ),
+              }
+            : pattern,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const setMasterDelay = useCallback((params: Partial<DelaySettings>) => {
+    audioEngine.current.setDelayParams(params);
+    setState((prev) => ({
+      ...prev,
+      masterDelay: { ...prev.masterDelay, ...params },
+    }));
+  }, []);
+
   // Derive active pattern tracks for component consumption
   const activePattern = getActivePattern(state);
   const tracks = activePattern?.tracks ?? [];
@@ -869,6 +903,8 @@ function useSequencer() {
     setMasterVolume,
     setTrackReverbSend,
     setMasterReverb,
+    setTrackDelaySend,
+    setMasterDelay,
   };
 }
 

@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync } from '../types';
 
 class AudioEngine {
   private context: AudioContext;
@@ -15,6 +15,15 @@ class AudioEngine {
   private reverbConvolver: ConvolverNode;
   private reverbDamping: BiquadFilterNode;
   private reverbReturnGain: GainNode;
+
+  // Delay send/return bus
+  private delaySendGains: Map<InstrumentName, GainNode> = new Map();
+  private delayBus: GainNode;
+  private delayNode: DelayNode;
+  private delayFeedback: GainNode;
+  private delayFilter: BiquadFilterNode;
+  private delayReturnGain: GainNode;
+  private delayBpm: number = 120;
 
   constructor() {
     this.context = new AudioContext();
@@ -50,6 +59,29 @@ class AudioEngine {
     // Generate initial impulse response
     this.reverbConvolver.buffer = this.generateImpulseResponse(2, 4000);
 
+    // Delay send/return bus
+    // Signal flow: channel send gains → delayBus → delayNode → filter → returnGain → masterGain
+    //                                                  ↑            ↓
+    //                                                  └── feedback ←┘
+    this.delayBus = this.context.createGain();
+    this.delayNode = this.context.createDelay(2); // max 2 seconds
+    this.delayNode.delayTime.value = 0.5; // default 1/4 at 120bpm
+    this.delayFeedback = this.context.createGain();
+    this.delayFeedback.gain.value = 0.4;
+    this.delayFilter = this.context.createBiquadFilter();
+    this.delayFilter.type = 'lowpass';
+    this.delayFilter.frequency.value = 6000;
+    this.delayFilter.Q.value = 0.7;
+    this.delayReturnGain = this.context.createGain();
+    this.delayReturnGain.gain.value = 0.7;
+
+    this.delayBus.connect(this.delayNode);
+    this.delayNode.connect(this.delayFilter);
+    this.delayFilter.connect(this.delayReturnGain);
+    this.delayFilter.connect(this.delayFeedback);
+    this.delayFeedback.connect(this.delayNode);
+    this.delayReturnGain.connect(this.masterGain);
+
     // Create a stereo panner + analyser per instrument channel
     const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion'];
     for (const name of instruments) {
@@ -67,9 +99,16 @@ class AudioEngine {
       panner.connect(sendGain);
       sendGain.connect(this.reverbBus);
 
+      // Delay send: taps from panner output into the delay bus
+      const delaySendGain = this.context.createGain();
+      delaySendGain.gain.value = 0; // dry by default
+      panner.connect(delaySendGain);
+      delaySendGain.connect(this.delayBus);
+
       this.panners.set(name, panner);
       this.channelAnalysers.set(name, analyser);
       this.reverbSendGains.set(name, sendGain);
+      this.delaySendGains.set(name, delaySendGain);
     }
 
     // Pre-generate a reusable white noise buffer (2 seconds of noise)
@@ -220,6 +259,50 @@ class AudioEngine {
       const decay = Math.max(0.1, Math.min(10, params.decay));
       const dampingFreq = this.reverbDamping.frequency.value;
       this.reverbConvolver.buffer = this.generateImpulseResponse(decay, dampingFreq);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Delay controls
+  // ---------------------------------------------------------------------------
+
+  /** Set the delay send level for a channel (0–1). */
+  setChannelDelaySend(instrument: InstrumentName, value: number): void {
+    const sendGain = this.delaySendGains.get(instrument);
+    if (sendGain) {
+      sendGain.gain.value = Math.max(0, Math.min(1, value));
+    }
+  }
+
+  /** Convert a sync division to delay time in seconds based on current BPM. */
+  private syncToSeconds(sync: DelaySync, bpm: number): number {
+    const beatSec = 60 / bpm; // quarter note duration
+    switch (sync) {
+      case '1/4':   return beatSec;
+      case '1/8':   return beatSec / 2;
+      case '1/16':  return beatSec / 4;
+      case '3/16':  return (beatSec / 4) * 3; // dotted eighth
+      case '1/4T':  return (beatSec * 2) / 3; // quarter triplet
+      case '1/8T':  return beatSec / 3; // eighth triplet
+    }
+  }
+
+  /** Update the delay BPM (recalculates tempo-synced delay time). */
+  setDelayBpm(bpm: number, sync: DelaySync): void {
+    this.delayBpm = bpm;
+    this.delayNode.delayTime.value = this.syncToSeconds(sync, bpm);
+  }
+
+  /** Update the master delay parameters. */
+  setDelayParams(params: Partial<DelaySettings>): void {
+    if (params.sync !== undefined) {
+      this.delayNode.delayTime.value = this.syncToSeconds(params.sync, this.delayBpm);
+    }
+    if (params.feedback !== undefined) {
+      this.delayFeedback.gain.value = Math.max(0, Math.min(0.9, params.feedback));
+    }
+    if (params.mix !== undefined) {
+      this.delayReturnGain.gain.value = Math.max(0, Math.min(1, params.mix));
     }
   }
 

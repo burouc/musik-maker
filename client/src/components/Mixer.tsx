@@ -1,11 +1,21 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import type { InstrumentName, Track, ReverbSettings } from '../types';
+import type { InstrumentName, Track, ReverbSettings, DelaySettings, DelaySync } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
+
+const DELAY_SYNC_OPTIONS: { value: DelaySync; label: string }[] = [
+  { value: '1/4', label: '1/4' },
+  { value: '1/8', label: '1/8' },
+  { value: '1/16', label: '1/16' },
+  { value: '3/16', label: '3/16' },
+  { value: '1/4T', label: '1/4T' },
+  { value: '1/8T', label: '1/8T' },
+];
 
 interface MixerProps {
   tracks: Track[];
   masterVolume: number;
   masterReverb: ReverbSettings;
+  masterDelay: DelaySettings;
   audioEngine: AudioEngine;
   onSetVolume: (trackId: InstrumentName, volume: number) => void;
   onSetPan: (trackId: InstrumentName, pan: number) => void;
@@ -15,6 +25,8 @@ interface MixerProps {
   onSetMasterVolume: (volume: number) => void;
   onSetReverbSend: (trackId: InstrumentName, send: number) => void;
   onSetMasterReverb: (params: Partial<ReverbSettings>) => void;
+  onSetDelaySend: (trackId: InstrumentName, send: number) => void;
+  onSetMasterDelay: (params: Partial<DelaySettings>) => void;
 }
 
 /** Number of LED segments in each VU meter */
@@ -61,6 +73,7 @@ const Mixer: React.FC<MixerProps> = ({
   tracks,
   masterVolume,
   masterReverb,
+  masterDelay,
   audioEngine,
   onSetVolume,
   onSetPan,
@@ -70,6 +83,8 @@ const Mixer: React.FC<MixerProps> = ({
   onSetMasterVolume,
   onSetReverbSend,
   onSetMasterReverb,
+  onSetDelaySend,
+  onSetMasterDelay,
 }) => {
   const rafRef = useRef<number>(0);
   const mixerRef = useRef<HTMLDivElement>(null);
@@ -152,6 +167,19 @@ const Mixer: React.FC<MixerProps> = ({
           <span className="mixer-reverb-display">
             {Math.round(track.reverbSend * 100)}%
           </span>
+          <label className="mixer-delay-label">DLY</label>
+          <input
+            type="range"
+            className="mixer-delay-slider"
+            min={0}
+            max={1}
+            step={0.01}
+            value={track.delaySend}
+            onChange={(e) => onSetDelaySend(track.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-delay-display">
+            {Math.round(track.delaySend * 100)}%
+          </span>
           <button
             className={`mixer-btn mute-btn${track.muted ? ' active' : ''}`}
             onClick={() => onToggleMute(track.id)}
@@ -230,6 +258,48 @@ const Mixer: React.FC<MixerProps> = ({
               onChange={(e) => onSetMasterReverb({ damping: parseFloat(e.target.value) })}
             />
             <span>{Math.round(masterReverb.damping * 100)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mixer-channel mixer-delay-channel">
+        <label className="mixer-channel-name mixer-delay-title">Delay</label>
+        <div className="mixer-delay-params">
+          <div className="mixer-delay-param">
+            <label>Sync</label>
+            <select
+              className="mixer-delay-sync-select"
+              value={masterDelay.sync}
+              onChange={(e) => onSetMasterDelay({ sync: e.target.value as DelaySync })}
+            >
+              {DELAY_SYNC_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mixer-delay-param">
+            <label>Feedback</label>
+            <input
+              type="range"
+              min={0}
+              max={0.9}
+              step={0.01}
+              value={masterDelay.feedback}
+              onChange={(e) => onSetMasterDelay({ feedback: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round(masterDelay.feedback * 100)}%</span>
+          </div>
+          <div className="mixer-delay-param">
+            <label>Mix</label>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={masterDelay.mix}
+              onChange={(e) => onSetMasterDelay({ mix: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round(masterDelay.mix * 100)}%</span>
           </div>
         </div>
       </div>

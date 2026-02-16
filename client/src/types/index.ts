@@ -20,6 +20,8 @@ export interface Track {
   solo: boolean;
   /** Reverb send level: 0 (dry) to 1 (full send) */
   reverbSend: number;
+  /** Delay send level: 0 (dry) to 1 (full send) */
+  delaySend: number;
 }
 
 export interface Pattern {
@@ -90,6 +92,21 @@ export interface ReverbSettings {
   damping: number;
 }
 
+/** Tempo-synced delay note division */
+export type DelaySync = '1/4' | '1/8' | '1/16' | '3/16' | '1/4T' | '1/8T';
+
+/** Delay parameters for the master delay effect */
+export interface DelaySettings {
+  /** Send level: 0 (dry) to 1 (full send) */
+  send: number;
+  /** Tempo-synced note division */
+  sync: DelaySync;
+  /** Feedback amount: 0 (single echo) to 0.9 (long trail) */
+  feedback: number;
+  /** Wet/dry mix: 0 (fully dry) to 1 (fully wet) */
+  mix: number;
+}
+
 export type PlaybackMode = 'pattern' | 'song';
 
 export interface SequencerState {
@@ -108,4 +125,6 @@ export interface SequencerState {
   masterVolume: number;
   /** Master reverb effect settings */
   masterReverb: ReverbSettings;
+  /** Master delay effect settings */
+  masterDelay: DelaySettings;
 }
