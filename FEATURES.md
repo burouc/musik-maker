@@ -97,7 +97,7 @@ Features are grouped by category. Each item is marked with a priority:
 ### 6. Sample Playback
 
 - [ ] **[P0]** Load audio files (WAV, MP3, OGG) as instruments
-- [ ] **[P0]** One-shot and looping sample playback modes
+- [x] **[P0]** One-shot and looping sample playback modes
 - [ ] **[P0]** Sample preview before loading
 - [ ] **[P1]** Basic sample editing (trim start/end, gain)
 - [ ] **[P1]** Pitch-shift samples to match note
