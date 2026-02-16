@@ -1,0 +1,220 @@
+{
+  "project": "musik-maker",
+  "description": "FL Studio clone feature backlog",
+  "generated_from": "FEATURES.md",
+  "priorities": {
+    "P0": "Core — must-have for a basic FL Studio clone",
+    "P1": "Important — expected by users familiar with FL Studio",
+    "P2": "Nice-to-have — polish and power-user features"
+  },
+  "categories": [
+    {
+      "id": "channel-rack",
+      "name": "Channel Rack / Step Sequencer Improvements",
+      "features": [
+        { "id": "cr-01", "priority": "P0", "title": "Variable step count per pattern (1–64 steps, not locked to 16)", "status": "pending" },
+        { "id": "cr-02", "priority": "P0", "title": "Per-step velocity editing (click-drag to set hit strength)", "status": "pending" },
+        { "id": "cr-03", "priority": "P0", "title": "Per-step pitch shifting for drum instruments", "status": "pending" },
+        { "id": "cr-04", "priority": "P1", "title": "Swing/shuffle control (adjustable percentage)", "status": "pending" },
+        { "id": "cr-05", "priority": "P1", "title": "Ghost notes (reduced velocity visual distinction)", "status": "pending" },
+        { "id": "cr-06", "priority": "P1", "title": "Step sequencer zoom (fit more/fewer steps on screen)", "status": "pending" },
+        { "id": "cr-07", "priority": "P2", "title": "Graph editor for per-step volume/pan/pitch curves", "status": "pending" },
+        { "id": "cr-08", "priority": "P2", "title": "Instrument re-ordering via drag-and-drop", "status": "pending" }
+      ]
+    },
+    {
+      "id": "piano-roll",
+      "name": "Piano Roll Enhancements",
+      "features": [
+        { "id": "pr-01", "priority": "P0", "title": "Click-and-drag to create notes with variable duration", "status": "pending" },
+        { "id": "pr-02", "priority": "P0", "title": "Note resize by dragging note edges", "status": "pending" },
+        { "id": "pr-03", "priority": "P0", "title": "Note deletion (right-click or delete key)", "status": "pending" },
+        { "id": "pr-04", "priority": "P0", "title": "Note selection (click, shift-click, box select)", "status": "pending" },
+        { "id": "pr-05", "priority": "P0", "title": "Move selected notes (drag, arrow keys)", "status": "pending" },
+        { "id": "pr-06", "priority": "P0", "title": "Copy/paste/duplicate notes", "status": "pending" },
+        { "id": "pr-07", "priority": "P1", "title": "Velocity lane below the piano roll grid", "status": "pending" },
+        { "id": "pr-08", "priority": "P1", "title": "Snap-to-grid with configurable grid resolution (1/4, 1/8, 1/16, 1/32, triplets)", "status": "pending" },
+        { "id": "pr-09", "priority": "P1", "title": "Zoom in/out (horizontal and vertical)", "status": "pending" },
+        { "id": "pr-10", "priority": "P1", "title": "Scroll/pan with middle-click or scroll wheel", "status": "pending" },
+        { "id": "pr-11", "priority": "P1", "title": "Piano roll tools: draw, select, slice, paint, erase", "status": "pending" },
+        { "id": "pr-12", "priority": "P2", "title": "Note color coding by velocity or channel", "status": "pending" },
+        { "id": "pr-13", "priority": "P2", "title": "Chord stamp tool (major, minor, 7th, etc.)", "status": "pending" },
+        { "id": "pr-14", "priority": "P2", "title": "Scale highlighting (show in-scale notes)", "status": "pending" },
+        { "id": "pr-15", "priority": "P2", "title": "Portamento/slide notes", "status": "pending" }
+      ]
+    },
+    {
+      "id": "mixer",
+      "name": "Mixer / Audio Routing",
+      "features": [
+        { "id": "mx-01", "priority": "P0", "title": "Master channel with master volume", "status": "pending" },
+        { "id": "mx-02", "priority": "P0", "title": "Per-channel pan control", "status": "pending" },
+        { "id": "mx-03", "priority": "P0", "title": "Visual VU meters (peak level display)", "status": "pending" },
+        { "id": "mx-04", "priority": "P1", "title": "Insert effect slots per mixer track (chain up to 8 effects)", "status": "pending" },
+        { "id": "mx-05", "priority": "P1", "title": "Send channels (route audio to FX buses)", "status": "pending" },
+        { "id": "mx-06", "priority": "P1", "title": "Mixer track routing (any channel to any mixer track)", "status": "pending" },
+        { "id": "mx-07", "priority": "P1", "title": "EQ per mixer track (at minimum a 3-band parametric EQ)", "status": "pending" },
+        { "id": "mx-08", "priority": "P2", "title": "Mixer track grouping / sub-mixes", "status": "pending" },
+        { "id": "mx-09", "priority": "P2", "title": "Sidechain routing visualization", "status": "pending" },
+        { "id": "mx-10", "priority": "P2", "title": "Mixer track renaming and color coding", "status": "pending" }
+      ]
+    },
+    {
+      "id": "effects",
+      "name": "Built-in Effects (Plugins)",
+      "features": [
+        { "id": "fx-01", "priority": "P0", "title": "Reverb (convolution or algorithmic)", "status": "pending" },
+        { "id": "fx-02", "priority": "P0", "title": "Delay (tempo-synced, with feedback and mix controls)", "status": "pending" },
+        { "id": "fx-03", "priority": "P0", "title": "Filter (low-pass, high-pass, band-pass with resonance)", "status": "pending" },
+        { "id": "fx-04", "priority": "P1", "title": "Compressor (threshold, ratio, attack, release, gain)", "status": "pending" },
+        { "id": "fx-05", "priority": "P1", "title": "Distortion / overdrive / saturation", "status": "pending" },
+        { "id": "fx-06", "priority": "P1", "title": "Chorus / flanger / phaser", "status": "pending" },
+        { "id": "fx-07", "priority": "P1", "title": "Limiter on master bus", "status": "pending" },
+        { "id": "fx-08", "priority": "P2", "title": "Bitcrusher", "status": "pending" },
+        { "id": "fx-09", "priority": "P2", "title": "Stereo widener / imager", "status": "pending" },
+        { "id": "fx-10", "priority": "P2", "title": "Graphic EQ (31-band)", "status": "pending" }
+      ]
+    },
+    {
+      "id": "synth",
+      "name": "Synthesizer / Instrument Engine",
+      "features": [
+        { "id": "sy-01", "priority": "P0", "title": "Polyphonic subtractive synth with oscillator selection (sine, saw, square, triangle)", "status": "pending" },
+        { "id": "sy-02", "priority": "P0", "title": "ADSR envelope for amplitude (attack, decay, sustain, release)", "status": "pending" },
+        { "id": "sy-03", "priority": "P0", "title": "ADSR envelope for filter cutoff", "status": "pending" },
+        { "id": "sy-04", "priority": "P0", "title": "Multiple oscillators with detune and mix", "status": "pending" },
+        { "id": "sy-05", "priority": "P1", "title": "LFO modulation (route to pitch, filter, volume, pan)", "status": "pending" },
+        { "id": "sy-06", "priority": "P1", "title": "Noise oscillator (white, pink)", "status": "pending" },
+        { "id": "sy-07", "priority": "P1", "title": "Unison / voice stacking with spread", "status": "pending" },
+        { "id": "sy-08", "priority": "P1", "title": "Preset system (save/load synth patches)", "status": "pending" },
+        { "id": "sy-09", "priority": "P2", "title": "FM synthesis mode", "status": "pending" },
+        { "id": "sy-10", "priority": "P2", "title": "Wavetable oscillator", "status": "pending" },
+        { "id": "sy-11", "priority": "P2", "title": "Arpeggiator", "status": "pending" }
+      ]
+    },
+    {
+      "id": "samples",
+      "name": "Sample Playback",
+      "features": [
+        { "id": "sp-01", "priority": "P0", "title": "Load audio files (WAV, MP3, OGG) as instruments", "status": "pending" },
+        { "id": "sp-02", "priority": "P0", "title": "One-shot and looping sample playback modes", "status": "pending" },
+        { "id": "sp-03", "priority": "P0", "title": "Sample preview before loading", "status": "pending" },
+        { "id": "sp-04", "priority": "P1", "title": "Basic sample editing (trim start/end, gain)", "status": "pending" },
+        { "id": "sp-05", "priority": "P1", "title": "Pitch-shift samples to match note", "status": "pending" },
+        { "id": "sp-06", "priority": "P1", "title": "Sample browser panel with folder navigation", "status": "pending" },
+        { "id": "sp-07", "priority": "P2", "title": "Time-stretch samples to match BPM", "status": "pending" },
+        { "id": "sp-08", "priority": "P2", "title": "Sliced breakbeat mode (chop a loop into steps)", "status": "pending" },
+        { "id": "sp-09", "priority": "P2", "title": "Drag-and-drop audio files from desktop", "status": "pending" }
+      ]
+    },
+    {
+      "id": "arrangement",
+      "name": "Arrangement / Playlist",
+      "features": [
+        { "id": "ar-01", "priority": "P0", "title": "Drag patterns onto the arrangement timeline", "status": "pending" },
+        { "id": "ar-02", "priority": "P0", "title": "Resize pattern clips on the timeline", "status": "pending" },
+        { "id": "ar-03", "priority": "P0", "title": "Move clips freely across tracks and time positions", "status": "pending" },
+        { "id": "ar-04", "priority": "P0", "title": "Loop markers (set start/end loop points)", "status": "pending" },
+        { "id": "ar-05", "priority": "P1", "title": "Audio clips directly on the arrangement timeline", "status": "pending" },
+        { "id": "ar-06", "priority": "P1", "title": "Automation clips on the arrangement timeline", "status": "pending" },
+        { "id": "ar-07", "priority": "P1", "title": "Track height resize", "status": "pending" },
+        { "id": "ar-08", "priority": "P1", "title": "Time signature support (3/4, 6/8, etc.)", "status": "pending" },
+        { "id": "ar-09", "priority": "P1", "title": "Markers / cue points for song sections (intro, verse, chorus)", "status": "pending" },
+        { "id": "ar-10", "priority": "P2", "title": "Clip fade-in / fade-out", "status": "pending" },
+        { "id": "ar-11", "priority": "P2", "title": "Time selection tool for rendering sections", "status": "pending" },
+        { "id": "ar-12", "priority": "P2", "title": "Arrangement track freezing (bounce to audio)", "status": "pending" }
+      ]
+    },
+    {
+      "id": "automation",
+      "name": "Automation",
+      "features": [
+        { "id": "au-01", "priority": "P0", "title": "Automation lanes for any knob/parameter", "status": "pending" },
+        { "id": "au-02", "priority": "P0", "title": "Draw automation curves (point-and-click or freehand)", "status": "pending" },
+        { "id": "au-03", "priority": "P0", "title": "Link automation to mixer volume, pan, effect params", "status": "pending" },
+        { "id": "au-04", "priority": "P1", "title": "Automation curve types (linear, smooth, stepped)", "status": "pending" },
+        { "id": "au-05", "priority": "P1", "title": "Copy/paste automation clips", "status": "pending" },
+        { "id": "au-06", "priority": "P2", "title": "LFO-based automation generator", "status": "pending" },
+        { "id": "au-07", "priority": "P2", "title": "Automation recording (move a knob while playing, record the motion)", "status": "pending" }
+      ]
+    },
+    {
+      "id": "transport",
+      "name": "Transport / Playback",
+      "features": [
+        { "id": "tp-01", "priority": "P0", "title": "Time position display (bars:beats:ticks and mm:ss)", "status": "pending" },
+        { "id": "tp-02", "priority": "P0", "title": "Click/metronome toggle", "status": "pending" },
+        { "id": "tp-03", "priority": "P1", "title": "Tap tempo", "status": "pending" },
+        { "id": "tp-04", "priority": "P1", "title": "Count-in before recording", "status": "pending" },
+        { "id": "tp-05", "priority": "P1", "title": "Song position scrubbing (click on timeline to jump)", "status": "pending" },
+        { "id": "tp-06", "priority": "P2", "title": "Time signature changes mid-song", "status": "pending" },
+        { "id": "tp-07", "priority": "P2", "title": "Tempo automation (BPM changes over time)", "status": "pending" }
+      ]
+    },
+    {
+      "id": "recording",
+      "name": "Recording",
+      "features": [
+        { "id": "rc-01", "priority": "P1", "title": "MIDI input recording from connected MIDI controllers", "status": "pending" },
+        { "id": "rc-02", "priority": "P1", "title": "Audio input recording (microphone / line-in via Web Audio)", "status": "pending" },
+        { "id": "rc-03", "priority": "P1", "title": "Quantize recorded MIDI notes (snap to grid after recording)", "status": "pending" },
+        { "id": "rc-04", "priority": "P2", "title": "Overdub recording mode", "status": "pending" },
+        { "id": "rc-05", "priority": "P2", "title": "Punch-in / punch-out recording", "status": "pending" }
+      ]
+    },
+    {
+      "id": "file-management",
+      "name": "File / Project Management",
+      "features": [
+        { "id": "fm-01", "priority": "P0", "title": "Save project to server (persist all patterns, arrangement, mixer state)", "status": "pending" },
+        { "id": "fm-02", "priority": "P0", "title": "Load saved projects", "status": "pending" },
+        { "id": "fm-03", "priority": "P0", "title": "New project / reset all", "status": "pending" },
+        { "id": "fm-04", "priority": "P1", "title": "Export to WAV (offline render via OfflineAudioContext)", "status": "pending" },
+        { "id": "fm-05", "priority": "P1", "title": "Export to MP3", "status": "pending" },
+        { "id": "fm-06", "priority": "P1", "title": "Undo / redo (full action history)", "status": "pending" },
+        { "id": "fm-07", "priority": "P1", "title": "Autosave with recovery", "status": "pending" },
+        { "id": "fm-08", "priority": "P2", "title": "Export MIDI file", "status": "pending" },
+        { "id": "fm-09", "priority": "P2", "title": "Import MIDI file", "status": "pending" },
+        { "id": "fm-10", "priority": "P2", "title": "Project templates (starter genres: trap, house, lo-fi, etc.)", "status": "pending" }
+      ]
+    },
+    {
+      "id": "ui-ux",
+      "name": "UI / UX",
+      "features": [
+        { "id": "ui-01", "priority": "P0", "title": "Resizable panels (drag dividers between sequencer, piano roll, mixer, arrangement)", "status": "pending" },
+        { "id": "ui-02", "priority": "P0", "title": "Tabbed view switching (Channel Rack, Piano Roll, Mixer, Arrangement)", "status": "pending" },
+        { "id": "ui-03", "priority": "P0", "title": "Keyboard shortcuts (space=play/stop, ctrl+z=undo, ctrl+s=save, etc.)", "status": "pending" },
+        { "id": "ui-04", "priority": "P1", "title": "Detachable / floating windows for piano roll and mixer", "status": "pending" },
+        { "id": "ui-05", "priority": "P1", "title": "Right-click context menus", "status": "pending" },
+        { "id": "ui-06", "priority": "P1", "title": "Tooltips on all controls", "status": "pending" },
+        { "id": "ui-07", "priority": "P1", "title": "Waveform visualization on audio clips", "status": "pending" },
+        { "id": "ui-08", "priority": "P1", "title": "Responsive layout for different screen sizes", "status": "pending" },
+        { "id": "ui-09", "priority": "P2", "title": "Theme customization (colors, dark/light modes)", "status": "pending" },
+        { "id": "ui-10", "priority": "P2", "title": "Full-screen mode", "status": "pending" },
+        { "id": "ui-11", "priority": "P2", "title": "Touch-friendly controls for tablet use", "status": "pending" }
+      ]
+    },
+    {
+      "id": "browser",
+      "name": "Browser / Content Panel",
+      "features": [
+        { "id": "br-01", "priority": "P1", "title": "Left-side browser panel (like FL Studio's sidebar)", "status": "pending" },
+        { "id": "br-02", "priority": "P1", "title": "Browse instruments, effects, samples, presets", "status": "pending" },
+        { "id": "br-03", "priority": "P1", "title": "Search / filter content", "status": "pending" },
+        { "id": "br-04", "priority": "P1", "title": "Favorites / bookmarks", "status": "pending" },
+        { "id": "br-05", "priority": "P2", "title": "Plugin scanner for Web Audio plugins", "status": "pending" }
+      ]
+    },
+    {
+      "id": "collaboration",
+      "name": "Collaboration & Sharing",
+      "features": [
+        { "id": "co-01", "priority": "P2", "title": "Share project via URL", "status": "pending" },
+        { "id": "co-02", "priority": "P2", "title": "Real-time collaboration (multiple users editing same project)", "status": "pending" },
+        { "id": "co-03", "priority": "P2", "title": "Export and share rendered audio", "status": "pending" },
+        { "id": "co-04", "priority": "P2", "title": "Community preset/sample sharing", "status": "pending" }
+      ]
+    }
+  ]
+}
