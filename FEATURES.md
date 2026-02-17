@@ -74,7 +74,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [ ] **[P0]** Filter (low-pass, high-pass, band-pass with resonance)
 - [ ] **[P1]** Compressor (threshold, ratio, attack, release, gain)
 - [x] **[P1]** Distortion / overdrive / saturation
-- [ ] **[P1]** Chorus / flanger / phaser
+- [x] **[P1]** Chorus / flanger / phaser
 - [ ] **[P1]** Limiter on master bus
 - [ ] **[P2]** Bitcrusher
 - [ ] **[P2]** Stereo widener / imager
