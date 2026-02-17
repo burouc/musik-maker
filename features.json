@@ -190,7 +190,7 @@
           "id": "mx-05",
           "priority": "P1",
           "title": "Send channels (route audio to FX buses)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "mx-06",

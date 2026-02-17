@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams } from '../types';
-import { MAX_INSERT_EFFECTS } from '../types';
+import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, SendChannel } from '../types';
+import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
 const DELAY_SYNC_OPTIONS: { value: DelaySync; label: string }[] = [
@@ -59,6 +59,17 @@ interface MixerProps {
   onToggleInsertEffect: (channelId: string, effectId: string) => void;
   onUpdateInsertEffectParams: (channelId: string, effectId: string, params: Partial<InsertEffectParams>) => void;
   onMoveInsertEffect: (channelId: string, effectId: string, direction: 'up' | 'down') => void;
+  sendChannels: SendChannel[];
+  onAddSendChannel: () => void;
+  onRemoveSendChannel: (sendChannelId: string) => void;
+  onRenameSendChannel: (sendChannelId: string, name: string) => void;
+  onSetSendChannelVolume: (sendChannelId: string, volume: number) => void;
+  onSetChannelSendLevel: (sourceChannelId: string, sendChannelId: string, level: number) => void;
+  onAddSendChannelInsertEffect: (sendChannelId: string, effectType: InsertEffectType) => void;
+  onRemoveSendChannelInsertEffect: (sendChannelId: string, effectId: string) => void;
+  onToggleSendChannelInsertEffect: (sendChannelId: string, effectId: string) => void;
+  onUpdateSendChannelInsertEffectParams: (sendChannelId: string, effectId: string, params: Partial<InsertEffectParams>) => void;
+  onMoveSendChannelInsertEffect: (sendChannelId: string, effectId: string, direction: 'up' | 'down') => void;
 }
 
 /** Number of LED segments in each VU meter */
@@ -361,6 +372,17 @@ const Mixer: React.FC<MixerProps> = ({
   onToggleInsertEffect,
   onUpdateInsertEffectParams,
   onMoveInsertEffect,
+  sendChannels,
+  onAddSendChannel,
+  onRemoveSendChannel,
+  onRenameSendChannel,
+  onSetSendChannelVolume,
+  onSetChannelSendLevel,
+  onAddSendChannelInsertEffect,
+  onRemoveSendChannelInsertEffect,
+  onToggleSendChannelInsertEffect,
+  onUpdateSendChannelInsertEffectParams,
+  onMoveSendChannelInsertEffect,
 }) => {
   const rafRef = useRef<number>(0);
   const mixerRef = useRef<HTMLDivElement>(null);
@@ -381,6 +403,8 @@ const Mixer: React.FC<MixerProps> = ({
       let level: number;
       if (id === 'master') {
         level = audioEngine.getMasterLevel();
+      } else if (id.startsWith('send-')) {
+        level = audioEngine.getSendChannelLevel(id);
       } else if (id.startsWith('strack-')) {
         level = audioEngine.getSampleChannelLevel(id);
       } else {
@@ -474,6 +498,23 @@ const Mixer: React.FC<MixerProps> = ({
           <span className="mixer-filter-display">
             {Math.round(track.filterSend * 100)}%
           </span>
+          {sendChannels.map((sc) => (
+            <React.Fragment key={sc.id}>
+              <label className="mixer-send-label">{sc.name.length > 6 ? sc.name.slice(0, 6) : sc.name}</label>
+              <input
+                type="range"
+                className="mixer-send-slider"
+                min={0}
+                max={1}
+                step={0.01}
+                value={track.sends?.[sc.id] ?? 0}
+                onChange={(e) => onSetChannelSendLevel(track.id, sc.id, parseFloat(e.target.value))}
+              />
+              <span className="mixer-send-display">
+                {Math.round((track.sends?.[sc.id] ?? 0) * 100)}%
+              </span>
+            </React.Fragment>
+          ))}
           <InsertEffectRack
             channelId={track.id}
             effects={track.insertEffects ?? []}
@@ -573,6 +614,23 @@ const Mixer: React.FC<MixerProps> = ({
           <span className="mixer-filter-display">
             {Math.round(track.filterSend * 100)}%
           </span>
+          {sendChannels.map((sc) => (
+            <React.Fragment key={sc.id}>
+              <label className="mixer-send-label">{sc.name.length > 6 ? sc.name.slice(0, 6) : sc.name}</label>
+              <input
+                type="range"
+                className="mixer-send-slider"
+                min={0}
+                max={1}
+                step={0.01}
+                value={track.sends?.[sc.id] ?? 0}
+                onChange={(e) => onSetChannelSendLevel(track.id, sc.id, parseFloat(e.target.value))}
+              />
+              <span className="mixer-send-display">
+                {Math.round((track.sends?.[sc.id] ?? 0) * 100)}%
+              </span>
+            </React.Fragment>
+          ))}
           <InsertEffectRack
             channelId={track.id}
             effects={track.insertEffects ?? []}
@@ -747,6 +805,55 @@ const Mixer: React.FC<MixerProps> = ({
           </div>
         </div>
       </div>
+
+      {sendChannels.map((sc) => (
+        <div key={sc.id} className="mixer-channel mixer-send-channel">
+          <label className="mixer-channel-name mixer-send-title">{sc.name}</label>
+          <div className="mixer-meter-and-slider">
+            <VuMeter meterId={sc.id} />
+            <input
+              type="range"
+              className="mixer-volume-slider"
+              min={0}
+              max={1}
+              step={0.01}
+              value={sc.volume}
+              onChange={(e) => onSetSendChannelVolume(sc.id, parseFloat(e.target.value))}
+            />
+          </div>
+          <span className="mixer-volume-display">
+            {Math.round(sc.volume * 100)}%
+          </span>
+          <InsertEffectRack
+            channelId={sc.id}
+            effects={sc.insertEffects ?? []}
+            onAdd={(channelId, effectType) => onAddSendChannelInsertEffect(channelId, effectType)}
+            onRemove={(channelId, effectId) => onRemoveSendChannelInsertEffect(channelId, effectId)}
+            onToggle={(channelId, effectId) => onToggleSendChannelInsertEffect(channelId, effectId)}
+            onUpdateParams={(channelId, effectId, params) => onUpdateSendChannelInsertEffectParams(channelId, effectId, params)}
+            onMove={(channelId, effectId, direction) => onMoveSendChannelInsertEffect(channelId, effectId, direction)}
+          />
+          <button
+            className="mixer-btn clear-btn"
+            onClick={() => onRemoveSendChannel(sc.id)}
+            title="Remove send channel"
+          >
+            DEL
+          </button>
+        </div>
+      ))}
+
+      {sendChannels.length < MAX_SEND_CHANNELS && (
+        <div className="mixer-channel mixer-add-send-channel">
+          <button
+            className="mixer-add-send-btn"
+            onClick={onAddSendChannel}
+            title="Add FX bus send channel"
+          >
+            + FX Bus
+          </button>
+        </div>
+      )}
     </div>
   );
 };

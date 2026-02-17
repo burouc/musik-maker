@@ -99,6 +99,17 @@ function App() {
     toggleInsertEffect,
     updateInsertEffectParams,
     moveInsertEffect,
+    // Send channels (FX buses)
+    addSendChannel,
+    removeSendChannel,
+    renameSendChannel,
+    setSendChannelVolume,
+    setChannelSendLevel,
+    addSendChannelInsertEffect,
+    removeSendChannelInsertEffect,
+    toggleSendChannelInsertEffect,
+    updateSendChannelInsertEffectParams,
+    moveSendChannelInsertEffect,
     // Automation
     addAutomationLane,
     removeAutomationLane,
@@ -418,6 +429,17 @@ function App() {
             onToggleInsertEffect={toggleInsertEffect}
             onUpdateInsertEffectParams={updateInsertEffectParams}
             onMoveInsertEffect={moveInsertEffect}
+            sendChannels={state.sendChannels}
+            onAddSendChannel={addSendChannel}
+            onRemoveSendChannel={removeSendChannel}
+            onRenameSendChannel={renameSendChannel}
+            onSetSendChannelVolume={setSendChannelVolume}
+            onSetChannelSendLevel={setChannelSendLevel}
+            onAddSendChannelInsertEffect={addSendChannelInsertEffect}
+            onRemoveSendChannelInsertEffect={removeSendChannelInsertEffect}
+            onToggleSendChannelInsertEffect={toggleSendChannelInsertEffect}
+            onUpdateSendChannelInsertEffectParams={updateSendChannelInsertEffectParams}
+            onMoveSendChannelInsertEffect={moveSendChannelInsertEffect}
           />
         </ResizablePanel>
       )}

@@ -1325,6 +1325,73 @@
   cursor: pointer;
 }
 
+/* Send channel labels and sliders on source tracks */
+.mixer-send-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #c084fc;
+}
+
+.mixer-send-slider {
+  width: 80px;
+  accent-color: #c084fc;
+  height: 4px;
+}
+
+.mixer-send-display {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+/* Send channel (FX bus) mixer strip */
+.mixer-send-channel {
+  border-left: 2px solid #c084fc;
+  margin-left: 8px;
+  padding-left: 12px;
+  background: var(--bg-secondary);
+  min-width: 80px;
+}
+
+.mixer-send-title {
+  color: #c084fc !important;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* Add send channel button strip */
+.mixer-add-send-channel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  border-left: 1px dashed var(--border);
+  margin-left: 8px;
+  padding-left: 8px;
+}
+
+.mixer-add-send-btn {
+  background: var(--bg-secondary);
+  color: #c084fc;
+  border: 1px dashed #c084fc;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mixer-add-send-btn:hover {
+  background: #c084fc;
+  color: var(--bg-primary);
+}
+
 /* Insert effect rack per channel */
 .insert-fx-rack {
   width: 100%;

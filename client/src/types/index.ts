@@ -26,6 +26,8 @@ export interface Track {
   filterSend: number;
   /** Insert effect chain (up to 8 effects) */
   insertEffects: InsertEffect[];
+  /** Per-send-channel send levels: { sendChannelId: 0–1 } */
+  sends: Record<string, number>;
 }
 
 export interface Pattern {
@@ -131,6 +133,21 @@ export type InsertEffectType = 'filter' | 'reverb' | 'delay' | 'distortion' | 'c
 
 /** Maximum number of insert effect slots per mixer channel */
 export const MAX_INSERT_EFFECTS = 8;
+
+/** Maximum number of user-defined send channels (FX buses) */
+export const MAX_SEND_CHANNELS = 4;
+
+/** A user-defined send/FX bus channel */
+export interface SendChannel {
+  /** Unique identifier */
+  id: string;
+  /** Display name (e.g. "FX Bus 1") */
+  name: string;
+  /** Bus output volume: 0–1 */
+  volume: number;
+  /** Insert effect chain on this send bus */
+  insertEffects: InsertEffect[];
+}
 
 /** Parameters for each insert effect type */
 export interface FilterEffectParams {
@@ -303,6 +320,8 @@ export interface SampleTrack {
   filterSend: number;
   /** Insert effect chain (up to 8 effects) */
   insertEffects: InsertEffect[];
+  /** Per-send-channel send levels: { sendChannelId: 0–1 } */
+  sends: Record<string, number>;
 }
 
 /** Per-channel automation target format: `${channelType}:${channelId}:${param}` */
@@ -364,6 +383,8 @@ export interface ProjectData {
   metronomeEnabled: boolean;
   /** Swing amount: 0 = straight, 0.5 = light shuffle, 1 = full triplet swing */
   swing: number;
+  /** User-defined send/FX bus channels */
+  sendChannels: SendChannel[];
 }
 
 export type PlaybackMode = 'pattern' | 'song';
@@ -407,4 +428,6 @@ export interface SequencerState {
   metronomeEnabled: boolean;
   /** Swing amount: 0 = straight, 0.5 = light shuffle, 1 = full triplet swing */
   swing: number;
+  /** User-defined send/FX bus channels */
+  sendChannels: SendChannel[];
 }

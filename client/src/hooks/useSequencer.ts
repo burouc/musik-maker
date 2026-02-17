@@ -22,8 +22,9 @@ import type {
   InsertEffect,
   InsertEffectType,
   InsertEffectParams,
+  SendChannel,
 } from '../types';
-import { MAX_INSERT_EFFECTS, DEFAULT_EFFECT_PARAMS } from '../types';
+import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS, DEFAULT_EFFECT_PARAMS } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
 const DEFAULT_STEP_COUNT = 16;
@@ -68,12 +69,12 @@ const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
-    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
-    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
-    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
-    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
   ];
 }
 
@@ -125,6 +126,7 @@ const INITIAL_STATE: SequencerState = {
   automationLanes: [],
   metronomeEnabled: false,
   swing: 0,
+  sendChannels: [],
 };
 
 const MAX_UNDO_HISTORY = 50;
@@ -597,8 +599,8 @@ function useSequencer() {
         name: `${source.name} (copy)`,
         color: PATTERN_COLORS[prev.patterns.length % PATTERN_COLORS.length],
         stepCount: source.stepCount,
-        tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches], insertEffects: (t.insertEffects ?? []).map((fx) => ({ ...fx, id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, params: { ...fx.params } })) })),
-        sampleTracks: source.sampleTracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches], insertEffects: (t.insertEffects ?? []).map((fx) => ({ ...fx, id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, params: { ...fx.params } })) })),
+        tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches], insertEffects: (t.insertEffects ?? []).map((fx) => ({ ...fx, id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, params: { ...fx.params } })), sends: { ...(t.sends ?? {}) } })),
+        sampleTracks: source.sampleTracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches], insertEffects: (t.insertEffects ?? []).map((fx) => ({ ...fx, id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, params: { ...fx.params } })), sends: { ...(t.sends ?? {}) } })),
         pianoRoll: { notes: source.pianoRoll.notes.map((n) => ({ ...n })) },
         synthSettings: { ...source.synthSettings },
       };
@@ -1505,6 +1507,7 @@ function useSequencer() {
         delaySend: 0,
         filterSend: 0,
         insertEffects: [],
+        sends: {},
       };
       return {
         ...prev,
@@ -1892,6 +1895,197 @@ function useSequencer() {
   );
 
   // -----------------------------------------------------------------------
+  // Send channel (FX bus) actions
+  // -----------------------------------------------------------------------
+
+  const addSendChannel = useCallback(() => {
+    pushUndo();
+    setState((prev) => {
+      if (prev.sendChannels.length >= MAX_SEND_CHANNELS) return prev;
+      const id = `send-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const newChannel: SendChannel = {
+        id,
+        name: `FX Bus ${prev.sendChannels.length + 1}`,
+        volume: 1,
+        insertEffects: [],
+      };
+      audioEngine.current.ensureSendChannel(id, 1);
+      return { ...prev, sendChannels: [...prev.sendChannels, newChannel] };
+    });
+  }, [pushUndo]);
+
+  const removeSendChannel = useCallback((sendChannelId: string) => {
+    pushUndo();
+    audioEngine.current.removeSendChannel(sendChannelId);
+    setState((prev) => {
+      // Remove the send channel
+      const sendChannels = prev.sendChannels.filter((c) => c.id !== sendChannelId);
+      // Remove send levels referencing this channel from all tracks
+      const patterns = prev.patterns.map((pattern) => ({
+        ...pattern,
+        tracks: pattern.tracks.map((t) => {
+          const sends = { ...t.sends };
+          delete sends[sendChannelId];
+          return { ...t, sends };
+        }),
+        sampleTracks: pattern.sampleTracks.map((t) => {
+          const sends = { ...t.sends };
+          delete sends[sendChannelId];
+          return { ...t, sends };
+        }),
+      }));
+      return { ...prev, sendChannels, patterns };
+    });
+  }, [pushUndo]);
+
+  const renameSendChannel = useCallback((sendChannelId: string, name: string) => {
+    setState((prev) => ({
+      ...prev,
+      sendChannels: prev.sendChannels.map((c) =>
+        c.id === sendChannelId ? { ...c, name } : c,
+      ),
+    }));
+  }, []);
+
+  const setSendChannelVolume = useCallback((sendChannelId: string, volume: number) => {
+    const clamped = Math.max(0, Math.min(1, volume));
+    audioEngine.current.setSendChannelVolume(sendChannelId, clamped);
+    setState((prev) => ({
+      ...prev,
+      sendChannels: prev.sendChannels.map((c) =>
+        c.id === sendChannelId ? { ...c, volume: clamped } : c,
+      ),
+    }));
+  }, []);
+
+  /** Set the send level from a source channel to a send channel */
+  const setChannelSendLevel = useCallback((sourceChannelId: string, sendChannelId: string, level: number) => {
+    const clamped = Math.max(0, Math.min(1, level));
+    audioEngine.current.setChannelSendLevel(sourceChannelId, sendChannelId, clamped);
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        // Try drum tracks
+        const hasDrum = pattern.tracks.some((t) => t.id === sourceChannelId);
+        if (hasDrum) {
+          return {
+            ...pattern,
+            tracks: pattern.tracks.map((t) =>
+              t.id === sourceChannelId
+                ? { ...t, sends: { ...t.sends, [sendChannelId]: clamped } }
+                : t,
+            ),
+          };
+        }
+        // Try sample tracks
+        return {
+          ...pattern,
+          sampleTracks: pattern.sampleTracks.map((t) =>
+            t.id === sourceChannelId
+              ? { ...t, sends: { ...t.sends, [sendChannelId]: clamped } }
+              : t,
+          ),
+        };
+      }),
+    }));
+  }, []);
+
+  /** Add insert effect to a send channel */
+  const addSendChannelInsertEffect = useCallback(
+    (sendChannelId: string, effectType: InsertEffectType) => {
+      pushUndo();
+      setState((prev) => ({
+        ...prev,
+        sendChannels: prev.sendChannels.map((c) => {
+          if (c.id !== sendChannelId) return c;
+          if (c.insertEffects.length >= MAX_INSERT_EFFECTS) return c;
+          const newEffect: InsertEffect = {
+            id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            effectType,
+            enabled: true,
+            params: { ...DEFAULT_EFFECT_PARAMS[effectType] },
+          };
+          const effects = [...c.insertEffects, newEffect];
+          audioEngine.current.rebuildSendChannelInsertEffects(sendChannelId, effects);
+          return { ...c, insertEffects: effects };
+        }),
+      }));
+    },
+    [pushUndo],
+  );
+
+  const removeSendChannelInsertEffect = useCallback(
+    (sendChannelId: string, effectId: string) => {
+      pushUndo();
+      setState((prev) => ({
+        ...prev,
+        sendChannels: prev.sendChannels.map((c) => {
+          if (c.id !== sendChannelId) return c;
+          const effects = c.insertEffects.filter((fx) => fx.id !== effectId);
+          audioEngine.current.rebuildSendChannelInsertEffects(sendChannelId, effects);
+          return { ...c, insertEffects: effects };
+        }),
+      }));
+    },
+    [pushUndo],
+  );
+
+  const toggleSendChannelInsertEffect = useCallback(
+    (sendChannelId: string, effectId: string) => {
+      setState((prev) => ({
+        ...prev,
+        sendChannels: prev.sendChannels.map((c) => {
+          if (c.id !== sendChannelId) return c;
+          const effects = c.insertEffects.map((fx) =>
+            fx.id === effectId ? { ...fx, enabled: !fx.enabled } : fx,
+          );
+          audioEngine.current.rebuildSendChannelInsertEffects(sendChannelId, effects);
+          return { ...c, insertEffects: effects };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const updateSendChannelInsertEffectParams = useCallback(
+    (sendChannelId: string, effectId: string, params: Partial<InsertEffectParams>) => {
+      setState((prev) => ({
+        ...prev,
+        sendChannels: prev.sendChannels.map((c) => {
+          if (c.id !== sendChannelId) return c;
+          const effects = c.insertEffects.map((fx) =>
+            fx.id === effectId ? { ...fx, params: { ...fx.params, ...params } } : fx,
+          );
+          audioEngine.current.rebuildSendChannelInsertEffects(sendChannelId, effects);
+          return { ...c, insertEffects: effects };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const moveSendChannelInsertEffect = useCallback(
+    (sendChannelId: string, effectId: string, direction: 'up' | 'down') => {
+      setState((prev) => ({
+        ...prev,
+        sendChannels: prev.sendChannels.map((c) => {
+          if (c.id !== sendChannelId) return c;
+          const idx = c.insertEffects.findIndex((fx) => fx.id === effectId);
+          if (idx < 0) return c;
+          const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+          if (targetIdx < 0 || targetIdx >= c.insertEffects.length) return c;
+          const arr = [...c.insertEffects];
+          [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
+          audioEngine.current.rebuildSendChannelInsertEffects(sendChannelId, arr);
+          return { ...c, insertEffects: arr };
+        }),
+      }));
+    },
+    [],
+  );
+
+  // -----------------------------------------------------------------------
   // Automation actions
   // -----------------------------------------------------------------------
 
@@ -2086,6 +2280,7 @@ function useSequencer() {
       loopEnd: s.loopEnd,
       metronomeEnabled: s.metronomeEnabled,
       swing: s.swing,
+      sendChannels: s.sendChannels,
     };
     const res = await fetch(`${API_BASE}/api/projects/${id}`, {
       method: 'PUT',
@@ -2118,6 +2313,7 @@ function useSequencer() {
       loopEnd: project.loopEnd,
       metronomeEnabled: project.metronomeEnabled,
       swing: project.swing ?? 0,
+      sendChannels: project.sendChannels ?? [],
       // Reset playback state
       isPlaying: false,
       currentStep: -1,
@@ -2130,6 +2326,13 @@ function useSequencer() {
     audioEngine.current.setDelayParams(project.masterDelay);
     audioEngine.current.setDelayBpm(project.bpm, project.masterDelay.sync);
     audioEngine.current.setFilterParams(project.masterFilter);
+    // Restore send channels
+    for (const sc of project.sendChannels ?? []) {
+      audioEngine.current.ensureSendChannel(sc.id, sc.volume);
+      if (sc.insertEffects.length > 0) {
+        audioEngine.current.rebuildSendChannelInsertEffects(sc.id, sc.insertEffects);
+      }
+    }
   }, [API_BASE]);
 
   const listProjects = useCallback(async (): Promise<{ id: string; name: string; updatedAt: string }[]> => {
@@ -2233,6 +2436,17 @@ function useSequencer() {
     toggleInsertEffect,
     updateInsertEffectParams,
     moveInsertEffect,
+    // Send channels (FX buses)
+    addSendChannel,
+    removeSendChannel,
+    renameSendChannel,
+    setSendChannelVolume,
+    setChannelSendLevel,
+    addSendChannelInsertEffect,
+    removeSendChannelInsertEffect,
+    toggleSendChannelInsertEffect,
+    updateSendChannelInsertEffectParams,
+    moveSendChannelInsertEffect,
     // Automation
     addAutomationLane,
     removeAutomationLane,

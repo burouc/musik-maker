@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, SendChannel } from '../types';
 
 /** Accepted MIME types for sample loading */
 const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {
@@ -63,6 +63,12 @@ class AudioEngine {
     panner: StereoPannerNode;
     analyser: AnalyserNode;
   }> = new Map();
+
+  // User-defined send/FX bus channels
+  // Each send channel has: inputBus → [insert FX chain] → outputGain → masterGain
+  private sendChannelBuses: Map<string, { inputBus: GainNode; outputGain: GainNode; analyser: AnalyserNode }> = new Map();
+  // Per-source-channel per-send-channel send gains: Map<`${sourceChannelId}:${sendChannelId}`, GainNode>
+  private sendChannelSendGains: Map<string, GainNode> = new Map();
 
   constructor() {
     this.context = new AudioContext();
@@ -538,6 +544,12 @@ class AudioEngine {
       if (reverbSend) { panner.connect(reverbSend); }
       if (delaySend) { panner.connect(delaySend); }
       if (filterSend) { panner.connect(filterSend); }
+      // Reconnect user-defined send channel gains
+      for (const [key, sendGain] of this.sendChannelSendGains) {
+        if (key.startsWith(`${channelId}:`)) {
+          panner.connect(sendGain);
+        }
+      }
       this.insertEffectChains.delete(channelId);
       return;
     }
@@ -589,6 +601,13 @@ class AudioEngine {
     if (reverbSend) { prevOutput.connect(reverbSend); }
     if (delaySend) { prevOutput.connect(delaySend); }
     if (filterSend) { prevOutput.connect(filterSend); }
+
+    // Reconnect user-defined send channel gains
+    for (const [key, sendGain] of this.sendChannelSendGains) {
+      if (key.startsWith(`${channelId}:`)) {
+        prevOutput.connect(sendGain);
+      }
+    }
 
     this.insertEffectChains.set(channelId, { effects: fxChain, panner, analyser });
   }
@@ -742,6 +761,214 @@ class AudioEngine {
     dryGain.connect(outputMerge);
 
     return { nodes: [inputSplitter, delay, lfo, lfoGain, wetGain, dryGain, outputMerge], inputNode: inputSplitter, outputNode: outputMerge };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Send channels (FX buses)
+  // ---------------------------------------------------------------------------
+
+  /** Create a send channel bus. Audio from source channels is summed here. */
+  ensureSendChannel(sendChannelId: string, volume: number = 1): void {
+    if (this.sendChannelBuses.has(sendChannelId)) return;
+
+    const inputBus = this.context.createGain();
+    inputBus.gain.value = 1;
+
+    const analyser = this.context.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.3;
+
+    const outputGain = this.context.createGain();
+    outputGain.gain.value = Math.max(0, Math.min(1, volume));
+
+    // Default routing: inputBus → analyser → outputGain → masterGain
+    inputBus.connect(analyser);
+    analyser.connect(outputGain);
+    outputGain.connect(this.masterGain);
+
+    this.sendChannelBuses.set(sendChannelId, { inputBus, outputGain, analyser });
+  }
+
+  /** Remove a send channel bus and all associated send gains. */
+  removeSendChannel(sendChannelId: string): void {
+    const bus = this.sendChannelBuses.get(sendChannelId);
+    if (bus) {
+      bus.inputBus.disconnect();
+      bus.analyser.disconnect();
+      bus.outputGain.disconnect();
+      this.sendChannelBuses.delete(sendChannelId);
+    }
+    // Remove all send gains that route to this send channel
+    for (const [key, gain] of this.sendChannelSendGains) {
+      if (key.endsWith(`:${sendChannelId}`)) {
+        gain.disconnect();
+        this.sendChannelSendGains.delete(key);
+      }
+    }
+    // Remove insert effect chain for the send channel
+    this.insertEffectChains.delete(sendChannelId);
+  }
+
+  /** Set the output volume of a send channel bus. */
+  setSendChannelVolume(sendChannelId: string, volume: number): void {
+    const bus = this.sendChannelBuses.get(sendChannelId);
+    if (bus) {
+      bus.outputGain.gain.value = Math.max(0, Math.min(1, volume));
+    }
+  }
+
+  /** Get peak level for a send channel. */
+  getSendChannelLevel(sendChannelId: string): number {
+    const bus = this.sendChannelBuses.get(sendChannelId);
+    if (!bus) return 0;
+    return this.readPeak(bus.analyser);
+  }
+
+  /**
+   * Set the send level from a source channel to a send channel.
+   * Creates/connects the send gain node if needed.
+   */
+  setChannelSendLevel(sourceChannelId: string, sendChannelId: string, level: number): void {
+    const bus = this.sendChannelBuses.get(sendChannelId);
+    if (!bus) return;
+
+    const key = `${sourceChannelId}:${sendChannelId}`;
+    let sendGain = this.sendChannelSendGains.get(key);
+
+    if (!sendGain) {
+      // Create new send gain and connect it
+      sendGain = this.context.createGain();
+      sendGain.gain.value = 0;
+      this.sendChannelSendGains.set(key, sendGain);
+      sendGain.connect(bus.inputBus);
+
+      // Connect from the source channel's post-insert output
+      // Find the final output node for this channel
+      this.connectSendGainToSource(sourceChannelId, sendGain);
+    }
+
+    sendGain.gain.value = Math.max(0, Math.min(1, level));
+  }
+
+  /**
+   * Rebuild the insert effect chain for a send channel.
+   * Signal flow: inputBus → [fx chain] → analyser → outputGain → masterGain
+   */
+  rebuildSendChannelInsertEffects(sendChannelId: string, effects: InsertEffect[]): void {
+    const bus = this.sendChannelBuses.get(sendChannelId);
+    if (!bus) return;
+
+    // Disconnect old chain
+    const existing = this.insertEffectChains.get(sendChannelId);
+    if (existing) {
+      for (const fx of existing.effects) {
+        for (const node of fx.nodes) {
+          node.disconnect();
+        }
+        fx.bypassGain.disconnect();
+        fx.wetGain.disconnect();
+      }
+    }
+
+    // Disconnect inputBus from everything
+    bus.inputBus.disconnect();
+
+    if (effects.length === 0) {
+      // No effects: inputBus → analyser → outputGain → masterGain
+      bus.inputBus.connect(bus.analyser);
+      bus.analyser.connect(bus.outputGain);
+      bus.outputGain.connect(this.masterGain);
+      this.insertEffectChains.delete(sendChannelId);
+      return;
+    }
+
+    // Build effect chain (same logic as regular channels)
+    const fxChain: { id: string; nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode; bypassGain: GainNode; wetGain: GainNode; enabled: boolean }[] = [];
+
+    for (const fx of effects) {
+      const { nodes, inputNode, outputNode } = this.createEffectNodes(fx);
+      const bypassGain = this.context.createGain();
+      const wetGain = this.context.createGain();
+
+      if (fx.enabled) {
+        bypassGain.gain.value = 0;
+        wetGain.gain.value = 1;
+      } else {
+        bypassGain.gain.value = 1;
+        wetGain.gain.value = 0;
+      }
+
+      outputNode.connect(wetGain);
+      fxChain.push({ id: fx.id, nodes, inputNode, outputNode, bypassGain, wetGain, enabled: fx.enabled });
+    }
+
+    // Wire: inputBus → fx1 → fx2 → ... → analyser → outputGain → masterGain
+    let prevOutput: AudioNode = bus.inputBus;
+
+    for (const fx of fxChain) {
+      prevOutput.connect(fx.inputNode);
+      prevOutput.connect(fx.bypassGain);
+      const merge = this.context.createGain();
+      merge.gain.value = 1;
+      fx.wetGain.connect(merge);
+      fx.bypassGain.connect(merge);
+      fx.nodes.push(merge);
+      prevOutput = merge;
+    }
+
+    prevOutput.connect(bus.analyser);
+    bus.analyser.connect(bus.outputGain);
+    bus.outputGain.connect(this.masterGain);
+
+    // Store using the same insertEffectChains map (reuse the bypass toggle logic)
+    this.insertEffectChains.set(sendChannelId, {
+      effects: fxChain,
+      panner: bus.inputBus as unknown as StereoPannerNode, // placeholder, not used for sends
+      analyser: bus.analyser,
+    });
+  }
+
+  /**
+   * Connect a send gain node to the post-insert output of a source channel.
+   * This taps from the same point as the reverb/delay/filter sends.
+   */
+  private connectSendGainToSource(sourceChannelId: string, sendGain: GainNode): void {
+    // Check if there's an insert effect chain — if so, find the final merge node
+    const chain = this.insertEffectChains.get(sourceChannelId);
+    if (chain && chain.effects.length > 0) {
+      // The last effect's last node is the merge node
+      const lastFx = chain.effects[chain.effects.length - 1];
+      const mergeNode = lastFx.nodes[lastFx.nodes.length - 1];
+      mergeNode.connect(sendGain);
+    } else {
+      // No insert effects: connect from the panner
+      const isInstrument = this.panners.has(sourceChannelId as InstrumentName);
+      const panner = isInstrument
+        ? this.panners.get(sourceChannelId as InstrumentName)
+        : this.samplePanners.get(sourceChannelId);
+      if (panner) {
+        panner.connect(sendGain);
+      }
+    }
+  }
+
+  /**
+   * Reconnect all send gains for a source channel (call after insert effects rebuild).
+   */
+  reconnectSendGains(sourceChannelId: string): void {
+    for (const [key, sendGain] of this.sendChannelSendGains) {
+      if (key.startsWith(`${sourceChannelId}:`)) {
+        // Disconnect and reconnect
+        // We can't selectively disconnect inputs, so we disconnect all and reconnect to bus
+        const sendChannelId = key.split(':').slice(1).join(':');
+        const bus = this.sendChannelBuses.get(sendChannelId);
+        if (bus) {
+          sendGain.disconnect();
+          sendGain.connect(bus.inputBus);
+          this.connectSendGainToSource(sourceChannelId, sendGain);
+        }
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
