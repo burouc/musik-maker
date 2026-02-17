@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType } from '../types';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams } from '../types';
+import { MAX_INSERT_EFFECTS } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
 const DELAY_SYNC_OPTIONS: { value: DelaySync; label: string }[] = [
@@ -15,6 +16,14 @@ const FILTER_TYPE_OPTIONS: { value: FilterType; label: string }[] = [
   { value: 'lowpass', label: 'LP' },
   { value: 'highpass', label: 'HP' },
   { value: 'bandpass', label: 'BP' },
+];
+
+const INSERT_EFFECT_OPTIONS: { value: InsertEffectType; label: string }[] = [
+  { value: 'filter', label: 'Filter' },
+  { value: 'reverb', label: 'Reverb' },
+  { value: 'delay', label: 'Delay' },
+  { value: 'distortion', label: 'Distort' },
+  { value: 'chorus', label: 'Chorus' },
 ];
 
 interface MixerProps {
@@ -45,6 +54,11 @@ interface MixerProps {
   onSetSampleReverbSend: (trackId: string, send: number) => void;
   onSetSampleDelaySend: (trackId: string, send: number) => void;
   onSetSampleFilterSend: (trackId: string, send: number) => void;
+  onAddInsertEffect: (channelId: string, effectType: InsertEffectType) => void;
+  onRemoveInsertEffect: (channelId: string, effectId: string) => void;
+  onToggleInsertEffect: (channelId: string, effectId: string) => void;
+  onUpdateInsertEffectParams: (channelId: string, effectId: string, params: Partial<InsertEffectParams>) => void;
+  onMoveInsertEffect: (channelId: string, effectId: string, direction: 'up' | 'down') => void;
 }
 
 /** Number of LED segments in each VU meter */
@@ -87,6 +101,233 @@ const VuMeter: React.FC<{ meterId: string }> = React.memo(({ meterId }) => {
 });
 VuMeter.displayName = 'VuMeter';
 
+/** Compact param editor for a single insert effect */
+const InsertEffectEditor: React.FC<{
+  effect: InsertEffect;
+  channelId: string;
+  onToggle: (channelId: string, effectId: string) => void;
+  onRemove: (channelId: string, effectId: string) => void;
+  onUpdateParams: (channelId: string, effectId: string, params: Partial<InsertEffectParams>) => void;
+  onMove: (channelId: string, effectId: string, direction: 'up' | 'down') => void;
+}> = React.memo(({ effect, channelId, onToggle, onRemove, onUpdateParams, onMove }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const renderParams = () => {
+    switch (effect.effectType) {
+      case 'filter': {
+        const p = effect.params as FilterEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Type</label>
+              <select
+                value={p.type}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { type: e.target.value as FilterType })}
+              >
+                {FILTER_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="insert-fx-param">
+              <label>Cutoff</label>
+              <input type="range" min={20} max={20000} step={1} value={p.cutoff}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { cutoff: parseFloat(e.target.value) })} />
+              <span>{p.cutoff >= 1000 ? `${(p.cutoff / 1000).toFixed(1)}k` : Math.round(p.cutoff)}Hz</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Res</label>
+              <input type="range" min={0.1} max={25} step={0.1} value={p.resonance}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { resonance: parseFloat(e.target.value) })} />
+              <span>{p.resonance.toFixed(1)}</span>
+            </div>
+          </>
+        );
+      }
+      case 'reverb': {
+        const p = effect.params as ReverbEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Decay</label>
+              <input type="range" min={0.1} max={10} step={0.1} value={p.decay}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { decay: parseFloat(e.target.value) })} />
+              <span>{p.decay.toFixed(1)}s</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Mix</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.mix}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { mix: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.mix * 100)}%</span>
+            </div>
+          </>
+        );
+      }
+      case 'delay': {
+        const p = effect.params as DelayEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Time</label>
+              <input type="range" min={0.01} max={2} step={0.01} value={p.time}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { time: parseFloat(e.target.value) })} />
+              <span>{(p.time * 1000).toFixed(0)}ms</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>FB</label>
+              <input type="range" min={0} max={0.9} step={0.01} value={p.feedback}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { feedback: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.feedback * 100)}%</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Mix</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.mix}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { mix: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.mix * 100)}%</span>
+            </div>
+          </>
+        );
+      }
+      case 'distortion': {
+        const p = effect.params as DistortionEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Drive</label>
+              <input type="range" min={1} max={100} step={1} value={p.drive}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { drive: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.drive)}</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Out</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.outputGain}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { outputGain: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.outputGain * 100)}%</span>
+            </div>
+          </>
+        );
+      }
+      case 'chorus': {
+        const p = effect.params as ChorusEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Rate</label>
+              <input type="range" min={0.1} max={10} step={0.1} value={p.rate}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { rate: parseFloat(e.target.value) })} />
+              <span>{p.rate.toFixed(1)}Hz</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Depth</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.depth}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { depth: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.depth * 100)}%</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Mix</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.mix}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { mix: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.mix * 100)}%</span>
+            </div>
+          </>
+        );
+      }
+    }
+  };
+
+  return (
+    <div className={`insert-fx-slot${effect.enabled ? '' : ' bypassed'}`}>
+      <div className="insert-fx-header">
+        <button
+          className={`insert-fx-power${effect.enabled ? ' active' : ''}`}
+          onClick={() => onToggle(channelId, effect.id)}
+          title={effect.enabled ? 'Bypass' : 'Enable'}
+        />
+        <button
+          className="insert-fx-name"
+          onClick={() => setExpanded(!expanded)}
+          title="Expand/collapse parameters"
+        >
+          {effect.effectType.charAt(0).toUpperCase() + effect.effectType.slice(1)}
+        </button>
+        <div className="insert-fx-actions">
+          <button onClick={() => onMove(channelId, effect.id, 'up')} title="Move up">^</button>
+          <button onClick={() => onMove(channelId, effect.id, 'down')} title="Move down">v</button>
+          <button onClick={() => onRemove(channelId, effect.id)} title="Remove">x</button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="insert-fx-params">
+          {renderParams()}
+        </div>
+      )}
+    </div>
+  );
+});
+InsertEffectEditor.displayName = 'InsertEffectEditor';
+
+/** Insert effect chain rack for a mixer channel */
+const InsertEffectRack: React.FC<{
+  channelId: string;
+  effects: InsertEffect[];
+  onAdd: (channelId: string, effectType: InsertEffectType) => void;
+  onRemove: (channelId: string, effectId: string) => void;
+  onToggle: (channelId: string, effectId: string) => void;
+  onUpdateParams: (channelId: string, effectId: string, params: Partial<InsertEffectParams>) => void;
+  onMove: (channelId: string, effectId: string, direction: 'up' | 'down') => void;
+}> = React.memo(({ channelId, effects, onAdd, onRemove, onToggle, onUpdateParams, onMove }) => {
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  return (
+    <div className="insert-fx-rack">
+      <div className="insert-fx-rack-header">
+        <span className="insert-fx-rack-label">INSERT FX</span>
+        <span className="insert-fx-rack-count">{effects.length}/{MAX_INSERT_EFFECTS}</span>
+      </div>
+      <div className="insert-fx-slots">
+        {effects.map((fx) => (
+          <InsertEffectEditor
+            key={fx.id}
+            effect={fx}
+            channelId={channelId}
+            onToggle={onToggle}
+            onRemove={onRemove}
+            onUpdateParams={onUpdateParams}
+            onMove={onMove}
+          />
+        ))}
+        {effects.length < MAX_INSERT_EFFECTS && (
+          <div className="insert-fx-add-wrapper">
+            <button
+              className="insert-fx-add-btn"
+              onClick={() => setShowAddMenu(!showAddMenu)}
+            >
+              + Add FX
+            </button>
+            {showAddMenu && (
+              <div className="insert-fx-add-menu">
+                {INSERT_EFFECT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    className="insert-fx-add-option"
+                    onClick={() => {
+                      onAdd(channelId, opt.value);
+                      setShowAddMenu(false);
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+InsertEffectRack.displayName = 'InsertEffectRack';
+
 const Mixer: React.FC<MixerProps> = ({
   tracks,
   sampleTracks,
@@ -115,6 +356,11 @@ const Mixer: React.FC<MixerProps> = ({
   onSetSampleReverbSend,
   onSetSampleDelaySend,
   onSetSampleFilterSend,
+  onAddInsertEffect,
+  onRemoveInsertEffect,
+  onToggleInsertEffect,
+  onUpdateInsertEffectParams,
+  onMoveInsertEffect,
 }) => {
   const rafRef = useRef<number>(0);
   const mixerRef = useRef<HTMLDivElement>(null);
@@ -228,6 +474,15 @@ const Mixer: React.FC<MixerProps> = ({
           <span className="mixer-filter-display">
             {Math.round(track.filterSend * 100)}%
           </span>
+          <InsertEffectRack
+            channelId={track.id}
+            effects={track.insertEffects ?? []}
+            onAdd={onAddInsertEffect}
+            onRemove={onRemoveInsertEffect}
+            onToggle={onToggleInsertEffect}
+            onUpdateParams={onUpdateInsertEffectParams}
+            onMove={onMoveInsertEffect}
+          />
           <button
             className={`mixer-btn mute-btn${track.muted ? ' active' : ''}`}
             onClick={() => onToggleMute(track.id)}
@@ -318,6 +573,15 @@ const Mixer: React.FC<MixerProps> = ({
           <span className="mixer-filter-display">
             {Math.round(track.filterSend * 100)}%
           </span>
+          <InsertEffectRack
+            channelId={track.id}
+            effects={track.insertEffects ?? []}
+            onAdd={onAddInsertEffect}
+            onRemove={onRemoveInsertEffect}
+            onToggle={onToggleInsertEffect}
+            onUpdateParams={onUpdateInsertEffectParams}
+            onMove={onMoveInsertEffect}
+          />
           <button
             className={`mixer-btn mute-btn${track.muted ? ' active' : ''}`}
             onClick={() => onToggleSampleMute(track.id)}

@@ -1325,6 +1325,210 @@
   cursor: pointer;
 }
 
+/* Insert effect rack per channel */
+.insert-fx-rack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.insert-fx-rack-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px;
+}
+
+.insert-fx-rack-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.insert-fx-rack-count {
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.insert-fx-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.insert-fx-slot {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.insert-fx-slot.bypassed {
+  opacity: 0.5;
+}
+
+.insert-fx-header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 3px;
+}
+
+.insert-fx-power {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--text-secondary);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.insert-fx-power.active {
+  background: #22c55e;
+  border-color: #22c55e;
+  box-shadow: 0 0 4px #22c55e;
+}
+
+.insert-fx-name {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  padding: 1px 2px;
+}
+
+.insert-fx-name:hover {
+  color: var(--accent);
+}
+
+.insert-fx-actions {
+  display: flex;
+  gap: 1px;
+}
+
+.insert-fx-actions button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.55rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.insert-fx-actions button:hover {
+  color: var(--accent);
+}
+
+.insert-fx-params {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 3px 4px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.insert-fx-param {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.insert-fx-param label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 28px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.insert-fx-param input[type='range'] {
+  flex: 1;
+  height: 3px;
+  accent-color: var(--accent);
+  min-width: 0;
+}
+
+.insert-fx-param select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 2px;
+  font-size: 0.6rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.insert-fx-param span {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.insert-fx-add-wrapper {
+  position: relative;
+}
+
+.insert-fx-add-btn {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 0.6rem;
+  padding: 3px 0;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.insert-fx-add-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--accent);
+}
+
+.insert-fx-add-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.insert-fx-add-option {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.65rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.insert-fx-add-option:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* VU meter + volume slider side by side */
 .mixer-meter-and-slider {
   display: flex;

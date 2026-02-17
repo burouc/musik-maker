@@ -24,6 +24,8 @@ export interface Track {
   delaySend: number;
   /** Filter send level: 0 (dry) to 1 (full send) */
   filterSend: number;
+  /** Insert effect chain (up to 8 effects) */
+  insertEffects: InsertEffect[];
 }
 
 export interface Pattern {
@@ -54,6 +56,9 @@ export interface ArrangementTrack {
   blocks: ArrangementBlock[];
   muted: boolean;
 }
+
+/** Piano roll editing tool */
+export type PianoRollTool = 'draw' | 'select' | 'slice' | 'paint' | 'erase';
 
 /** Snap-to-grid resolution for the piano roll */
 export type SnapResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/4T' | '1/8T' | '1/16T';
@@ -120,6 +125,76 @@ export interface DelaySettings {
 
 /** Filter type for the master filter effect */
 export type FilterType = 'lowpass' | 'highpass' | 'bandpass';
+
+/** Available insert effect types for mixer channel effect slots */
+export type InsertEffectType = 'filter' | 'reverb' | 'delay' | 'distortion' | 'chorus';
+
+/** Maximum number of insert effect slots per mixer channel */
+export const MAX_INSERT_EFFECTS = 8;
+
+/** Parameters for each insert effect type */
+export interface FilterEffectParams {
+  type: FilterType;
+  cutoff: number;
+  resonance: number;
+}
+
+export interface ReverbEffectParams {
+  decay: number;
+  preDelay: number;
+  damping: number;
+  mix: number;
+}
+
+export interface DelayEffectParams {
+  time: number;
+  feedback: number;
+  mix: number;
+}
+
+export interface DistortionEffectParams {
+  /** Drive amount: 0–100 */
+  drive: number;
+  /** Output gain: 0–1 */
+  outputGain: number;
+}
+
+export interface ChorusEffectParams {
+  /** LFO rate in Hz (0.1–10) */
+  rate: number;
+  /** Depth of modulation (0–1) */
+  depth: number;
+  /** Wet/dry mix (0–1) */
+  mix: number;
+}
+
+export type InsertEffectParams =
+  | FilterEffectParams
+  | ReverbEffectParams
+  | DelayEffectParams
+  | DistortionEffectParams
+  | ChorusEffectParams;
+
+/** A single insert effect slot on a mixer channel */
+export interface InsertEffect {
+  /** Unique identifier */
+  id: string;
+  /** Effect type */
+  effectType: InsertEffectType;
+  /** Whether this effect is active (bypassed if false) */
+  enabled: boolean;
+  /** Effect-specific parameters */
+  params: InsertEffectParams;
+}
+
+/** Default parameters for each effect type */
+export const DEFAULT_EFFECT_PARAMS: Record<InsertEffectType, InsertEffectParams> = {
+  filter: { type: 'lowpass', cutoff: 8000, resonance: 1 } as FilterEffectParams,
+  reverb: { decay: 2, preDelay: 0.01, damping: 0.3, mix: 0.5 } as ReverbEffectParams,
+  delay: { time: 0.25, feedback: 0.3, mix: 0.3 } as DelayEffectParams,
+  distortion: { drive: 20, outputGain: 0.7 } as DistortionEffectParams,
+  chorus: { rate: 1.5, depth: 0.5, mix: 0.5 } as ChorusEffectParams,
+};
 
 /** Filter parameters for the master filter effect */
 export interface FilterSettings {
@@ -226,6 +301,8 @@ export interface SampleTrack {
   delaySend: number;
   /** Filter send level: 0 (dry) to 1 (full send) */
   filterSend: number;
+  /** Insert effect chain (up to 8 effects) */
+  insertEffects: InsertEffect[];
 }
 
 /** Per-channel automation target format: `${channelType}:${channelId}:${param}` */

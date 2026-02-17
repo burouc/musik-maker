@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams } from '../types';
 
 /** Accepted MIME types for sample loading */
 const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {
@@ -54,6 +54,15 @@ class AudioEngine {
   private activeSampleSources: Map<string, { source: AudioBufferSourceNode; gain: GainNode }> = new Map();
   /** Active preview source (for auditioning samples before loading) */
   private previewSource: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
+
+  // Insert effect chains per channel
+  // Each channel stores an array of effect node groups + a dry bypass gain.
+  // Signal flow: panner → [effect1 → effect2 → ...] → analyser
+  private insertEffectChains: Map<string, {
+    effects: { id: string; nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode; bypassGain: GainNode; wetGain: GainNode; enabled: boolean }[];
+    panner: StereoPannerNode;
+    analyser: AnalyserNode;
+  }> = new Map();
 
   constructor() {
     this.context = new AudioContext();
@@ -472,6 +481,267 @@ class AudioEngine {
     if (params.resonance !== undefined) {
       this.filterNode.Q.value = Math.max(0.1, Math.min(25, params.resonance));
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Insert effect chains
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Rebuild the insert effect chain for a channel.
+   * Disconnects old chain, creates new Web Audio nodes, and wires them in series.
+   * @param channelId  Either an InstrumentName or a sample track ID
+   * @param effects    Array of InsertEffect definitions
+   */
+  rebuildInsertEffects(channelId: string, effects: InsertEffect[]): void {
+    // Determine the panner, analyser, and send gains for this channel
+    const isInstrument = this.panners.has(channelId as InstrumentName);
+    const panner = isInstrument
+      ? this.panners.get(channelId as InstrumentName)!
+      : this.samplePanners.get(channelId);
+    const analyser = isInstrument
+      ? this.channelAnalysers.get(channelId as InstrumentName)!
+      : this.sampleAnalysers.get(channelId);
+
+    if (!panner || !analyser) return;
+
+    // Get send gains (reverb, delay, filter) for reconnection
+    const reverbSend = isInstrument
+      ? this.reverbSendGains.get(channelId as InstrumentName)
+      : this.sampleReverbSendGains.get(channelId);
+    const delaySend = isInstrument
+      ? this.delaySendGains.get(channelId as InstrumentName)
+      : this.sampleDelaySendGains.get(channelId);
+    const filterSend = isInstrument
+      ? this.filterSendGains.get(channelId as InstrumentName)
+      : this.sampleFilterSendGains.get(channelId);
+
+    // Disconnect old chain
+    const existing = this.insertEffectChains.get(channelId);
+    if (existing) {
+      for (const fx of existing.effects) {
+        for (const node of fx.nodes) {
+          node.disconnect();
+        }
+        fx.bypassGain.disconnect();
+        fx.wetGain.disconnect();
+      }
+    }
+
+    // Disconnect panner from everything (will rewire below)
+    panner.disconnect();
+
+    if (effects.length === 0) {
+      // No insert effects: direct panner → analyser + sends
+      panner.connect(analyser);
+      analyser.connect(this.masterGain);
+      if (reverbSend) { panner.connect(reverbSend); }
+      if (delaySend) { panner.connect(delaySend); }
+      if (filterSend) { panner.connect(filterSend); }
+      this.insertEffectChains.delete(channelId);
+      return;
+    }
+
+    // Build effect node groups
+    const fxChain: typeof existing extends undefined ? never : NonNullable<typeof existing>['effects'] = [];
+
+    for (const fx of effects) {
+      const { nodes, inputNode, outputNode } = this.createEffectNodes(fx);
+      const bypassGain = this.context.createGain();
+      const wetGain = this.context.createGain();
+
+      if (fx.enabled) {
+        bypassGain.gain.value = 0;
+        wetGain.gain.value = 1;
+      } else {
+        bypassGain.gain.value = 1;
+        wetGain.gain.value = 0;
+      }
+
+      // Wire: input splits to both bypass and effect chain
+      // Output merges bypass and wet
+      outputNode.connect(wetGain);
+
+      fxChain.push({ id: fx.id, nodes, inputNode, outputNode, bypassGain, wetGain, enabled: fx.enabled });
+    }
+
+    // Wire chain: panner → fx1 → fx2 → ... → analyser
+    let prevOutput: AudioNode = panner;
+
+    for (const fx of fxChain) {
+      // prevOutput → inputNode (effect processing)
+      prevOutput.connect(fx.inputNode);
+      // prevOutput → bypassGain (dry bypass)
+      prevOutput.connect(fx.bypassGain);
+      // Create a merge node for this effect's output
+      const merge = this.context.createGain();
+      merge.gain.value = 1;
+      fx.wetGain.connect(merge);
+      fx.bypassGain.connect(merge);
+      // Store merge as a node so we can disconnect later
+      fx.nodes.push(merge);
+      prevOutput = merge;
+    }
+
+    // Final output → analyser + sends
+    prevOutput.connect(analyser);
+    analyser.connect(this.masterGain);
+    if (reverbSend) { prevOutput.connect(reverbSend); }
+    if (delaySend) { prevOutput.connect(delaySend); }
+    if (filterSend) { prevOutput.connect(filterSend); }
+
+    this.insertEffectChains.set(channelId, { effects: fxChain, panner, analyser });
+  }
+
+  /** Toggle bypass for a single insert effect slot. */
+  setInsertEffectEnabled(channelId: string, effectId: string, enabled: boolean): void {
+    const chain = this.insertEffectChains.get(channelId);
+    if (!chain) return;
+    const fx = chain.effects.find((f) => f.id === effectId);
+    if (!fx) return;
+    fx.enabled = enabled;
+    fx.bypassGain.gain.value = enabled ? 0 : 1;
+    fx.wetGain.gain.value = enabled ? 1 : 0;
+  }
+
+  /** Create Web Audio nodes for a given insert effect. */
+  private createEffectNodes(fx: InsertEffect): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    switch (fx.effectType) {
+      case 'filter':
+        return this.createFilterEffect(fx.params as FilterEffectParams);
+      case 'reverb':
+        return this.createReverbEffect(fx.params as ReverbEffectParams);
+      case 'delay':
+        return this.createDelayEffect(fx.params as DelayEffectParams);
+      case 'distortion':
+        return this.createDistortionEffect(fx.params as DistortionEffectParams);
+      case 'chorus':
+        return this.createChorusEffect(fx.params as ChorusEffectParams);
+    }
+  }
+
+  private createFilterEffect(params: FilterEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const filter = this.context.createBiquadFilter();
+    filter.type = params.type as BiquadFilterType;
+    filter.frequency.value = Math.max(20, Math.min(20000, params.cutoff));
+    filter.Q.value = Math.max(0.1, Math.min(25, params.resonance));
+    return { nodes: [filter], inputNode: filter, outputNode: filter };
+  }
+
+  private createReverbEffect(params: ReverbEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const preDelay = this.context.createDelay(0.1);
+    preDelay.delayTime.value = Math.max(0, Math.min(0.1, params.preDelay));
+
+    const convolver = this.context.createConvolver();
+    const dampFreq = 12000 - params.damping * 11000;
+    convolver.buffer = this.generateImpulseResponse(params.decay, dampFreq);
+
+    const wetGain = this.context.createGain();
+    wetGain.gain.value = params.mix;
+
+    const dryGain = this.context.createGain();
+    dryGain.gain.value = 1 - params.mix;
+
+    const inputSplitter = this.context.createGain();
+    inputSplitter.gain.value = 1;
+
+    const outputMerge = this.context.createGain();
+    outputMerge.gain.value = 1;
+
+    inputSplitter.connect(preDelay);
+    preDelay.connect(convolver);
+    convolver.connect(wetGain);
+    wetGain.connect(outputMerge);
+    inputSplitter.connect(dryGain);
+    dryGain.connect(outputMerge);
+
+    return { nodes: [inputSplitter, preDelay, convolver, wetGain, dryGain, outputMerge], inputNode: inputSplitter, outputNode: outputMerge };
+  }
+
+  private createDelayEffect(params: DelayEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const delay = this.context.createDelay(2);
+    delay.delayTime.value = Math.max(0.01, Math.min(2, params.time));
+
+    const feedback = this.context.createGain();
+    feedback.gain.value = Math.max(0, Math.min(0.9, params.feedback));
+
+    const wetGain = this.context.createGain();
+    wetGain.gain.value = params.mix;
+
+    const dryGain = this.context.createGain();
+    dryGain.gain.value = 1 - params.mix;
+
+    const inputSplitter = this.context.createGain();
+    inputSplitter.gain.value = 1;
+
+    const outputMerge = this.context.createGain();
+    outputMerge.gain.value = 1;
+
+    inputSplitter.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(wetGain);
+    wetGain.connect(outputMerge);
+    inputSplitter.connect(dryGain);
+    dryGain.connect(outputMerge);
+
+    return { nodes: [inputSplitter, delay, feedback, wetGain, dryGain, outputMerge], inputNode: inputSplitter, outputNode: outputMerge };
+  }
+
+  private createDistortionEffect(params: DistortionEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const waveshaper = this.context.createWaveShaper();
+    waveshaper.oversample = '4x';
+    const drive = Math.max(1, Math.min(100, params.drive));
+    const samples = 44100;
+    const curve = new Float32Array(samples);
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1;
+      curve[i] = ((Math.PI + drive) * x) / (Math.PI + drive * Math.abs(x));
+    }
+    waveshaper.curve = curve;
+
+    const outputGain = this.context.createGain();
+    outputGain.gain.value = Math.max(0, Math.min(1, params.outputGain));
+
+    waveshaper.connect(outputGain);
+
+    return { nodes: [waveshaper, outputGain], inputNode: waveshaper, outputNode: outputGain };
+  }
+
+  private createChorusEffect(params: ChorusEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const inputSplitter = this.context.createGain();
+    inputSplitter.gain.value = 1;
+
+    const delay = this.context.createDelay(0.05);
+    delay.delayTime.value = 0.025;
+
+    const lfo = this.context.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = Math.max(0.1, Math.min(10, params.rate));
+
+    const lfoGain = this.context.createGain();
+    lfoGain.gain.value = Math.max(0, Math.min(1, params.depth)) * 0.01;
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(delay.delayTime);
+    lfo.start();
+
+    const wetGain = this.context.createGain();
+    wetGain.gain.value = params.mix;
+
+    const dryGain = this.context.createGain();
+    dryGain.gain.value = 1 - params.mix;
+
+    const outputMerge = this.context.createGain();
+    outputMerge.gain.value = 1;
+
+    inputSplitter.connect(delay);
+    delay.connect(wetGain);
+    wetGain.connect(outputMerge);
+    inputSplitter.connect(dryGain);
+    dryGain.connect(outputMerge);
+
+    return { nodes: [inputSplitter, delay, lfo, lfoGain, wetGain, dryGain, outputMerge], inputNode: inputSplitter, outputNode: outputMerge };
   }
 
   // ---------------------------------------------------------------------------

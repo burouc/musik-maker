@@ -46,6 +46,7 @@ function App() {
     addPianoNote,
     deletePianoNote,
     updatePianoNote,
+    slicePianoNote,
     previewPianoNote,
     movePianoNotes,
     pastePianoNotes,
@@ -92,6 +93,12 @@ function App() {
     setSampleTrackReverbSend,
     setSampleTrackDelaySend,
     setSampleTrackFilterSend,
+    // Insert effects
+    addInsertEffect,
+    removeInsertEffect,
+    toggleInsertEffect,
+    updateInsertEffectParams,
+    moveInsertEffect,
     // Automation
     addAutomationLane,
     removeAutomationLane,
@@ -365,6 +372,7 @@ function App() {
               onAddNote={addPianoNote}
               onDeleteNote={deletePianoNote}
               onUpdateNote={updatePianoNote}
+              onSliceNote={slicePianoNote}
               onPreviewNote={previewPianoNote}
               onMoveNotes={movePianoNotes}
               onPasteNotes={pastePianoNotes}
@@ -405,6 +413,11 @@ function App() {
             onSetSampleReverbSend={setSampleTrackReverbSend}
             onSetSampleDelaySend={setSampleTrackDelaySend}
             onSetSampleFilterSend={setSampleTrackFilterSend}
+            onAddInsertEffect={addInsertEffect}
+            onRemoveInsertEffect={removeInsertEffect}
+            onToggleInsertEffect={toggleInsertEffect}
+            onUpdateInsertEffectParams={updateInsertEffectParams}
+            onMoveInsertEffect={moveInsertEffect}
           />
         </ResizablePanel>
       )}

@@ -19,7 +19,11 @@ import type {
   AutomationPoint,
   AutomationTarget,
   ProjectData,
+  InsertEffect,
+  InsertEffectType,
+  InsertEffectParams,
 } from '../types';
+import { MAX_INSERT_EFFECTS, DEFAULT_EFFECT_PARAMS } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
 const DEFAULT_STEP_COUNT = 16;
@@ -64,12 +68,12 @@ const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0 },
-    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0 },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0 },
-    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0 },
-    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0 },
-    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0 },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [] },
   ];
 }
 
@@ -593,8 +597,8 @@ function useSequencer() {
         name: `${source.name} (copy)`,
         color: PATTERN_COLORS[prev.patterns.length % PATTERN_COLORS.length],
         stepCount: source.stepCount,
-        tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches] })),
-        sampleTracks: source.sampleTracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches] })),
+        tracks: source.tracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches], insertEffects: (t.insertEffects ?? []).map((fx) => ({ ...fx, id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, params: { ...fx.params } })) })),
+        sampleTracks: source.sampleTracks.map((t) => ({ ...t, steps: [...t.steps], pitches: [...t.pitches], insertEffects: (t.insertEffects ?? []).map((fx) => ({ ...fx, id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, params: { ...fx.params } })) })),
         pianoRoll: { notes: source.pianoRoll.notes.map((n) => ({ ...n })) },
         synthSettings: { ...source.synthSettings },
       };
@@ -971,6 +975,36 @@ function useSequencer() {
             notes: pattern.pianoRoll.notes.map((n) =>
               n.id === noteId ? { ...n, ...updates } : n,
             ),
+          },
+        };
+      }),
+    }));
+  }, [pushUndo]);
+
+  const slicePianoNote = useCallback((noteId: string, sliceStep: number) => {
+    pushUndo();
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) => {
+        if (pattern.id !== prev.activePatternId) return pattern;
+        const note = pattern.pianoRoll.notes.find((n) => n.id === noteId);
+        if (!note) return pattern;
+        // Only slice if the cut point is inside the note (not at start or end)
+        if (sliceStep <= note.step || sliceStep >= note.step + note.duration) return pattern;
+        const leftDuration = sliceStep - note.step;
+        const rightDuration = note.duration - leftDuration;
+        const leftNote: PianoNote = { ...note, duration: leftDuration };
+        const rightNote: PianoNote = {
+          id: `note-${Date.now()}-${note.pitch}-${sliceStep}`,
+          pitch: note.pitch,
+          step: sliceStep,
+          duration: rightDuration,
+          velocity: note.velocity,
+        };
+        return {
+          ...pattern,
+          pianoRoll: {
+            notes: pattern.pianoRoll.notes.map((n) => (n.id === noteId ? leftNote : n)).concat(rightNote),
           },
         };
       }),
@@ -1470,6 +1504,7 @@ function useSequencer() {
         reverbSend: 0,
         delaySend: 0,
         filterSend: 0,
+        insertEffects: [],
       };
       return {
         ...prev,
@@ -1746,6 +1781,115 @@ function useSequencer() {
       ),
     }));
   }, []);
+
+  // -----------------------------------------------------------------------
+  // Insert effect chain actions
+  // -----------------------------------------------------------------------
+
+  /** Helper to update tracks or sampleTracks in the active pattern */
+  const updateChannelInsertEffects = useCallback(
+    (channelId: string, updater: (effects: InsertEffect[]) => InsertEffect[]) => {
+      setState((prev) => ({
+        ...prev,
+        patterns: prev.patterns.map((pattern) => {
+          if (pattern.id !== prev.activePatternId) return pattern;
+          // Try drum tracks first
+          const drumTrack = pattern.tracks.find((t) => t.id === channelId);
+          if (drumTrack) {
+            const updatedTracks = pattern.tracks.map((t) =>
+              t.id === channelId
+                ? { ...t, insertEffects: updater(t.insertEffects ?? []) }
+                : t,
+            );
+            // Rebuild audio engine chain
+            const updated = updatedTracks.find((t) => t.id === channelId)!;
+            audioEngine.current.rebuildInsertEffects(channelId, updated.insertEffects);
+            return { ...pattern, tracks: updatedTracks };
+          }
+          // Try sample tracks
+          const sampleTrack = pattern.sampleTracks.find((t) => t.id === channelId);
+          if (sampleTrack) {
+            const updatedSampleTracks = pattern.sampleTracks.map((t) =>
+              t.id === channelId
+                ? { ...t, insertEffects: updater(t.insertEffects ?? []) }
+                : t,
+            );
+            const updated = updatedSampleTracks.find((t) => t.id === channelId)!;
+            audioEngine.current.rebuildInsertEffects(channelId, updated.insertEffects);
+            return { ...pattern, sampleTracks: updatedSampleTracks };
+          }
+          return pattern;
+        }),
+      }));
+    },
+    [],
+  );
+
+  const addInsertEffect = useCallback(
+    (channelId: string, effectType: InsertEffectType) => {
+      pushUndo();
+      updateChannelInsertEffects(channelId, (effects) => {
+        if (effects.length >= MAX_INSERT_EFFECTS) return effects;
+        const newEffect: InsertEffect = {
+          id: `fx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          effectType,
+          enabled: true,
+          params: { ...DEFAULT_EFFECT_PARAMS[effectType] },
+        };
+        return [...effects, newEffect];
+      });
+    },
+    [pushUndo, updateChannelInsertEffects],
+  );
+
+  const removeInsertEffect = useCallback(
+    (channelId: string, effectId: string) => {
+      pushUndo();
+      updateChannelInsertEffects(channelId, (effects) =>
+        effects.filter((fx) => fx.id !== effectId),
+      );
+    },
+    [pushUndo, updateChannelInsertEffects],
+  );
+
+  const toggleInsertEffect = useCallback(
+    (channelId: string, effectId: string) => {
+      updateChannelInsertEffects(channelId, (effects) =>
+        effects.map((fx) =>
+          fx.id === effectId ? { ...fx, enabled: !fx.enabled } : fx,
+        ),
+      );
+    },
+    [updateChannelInsertEffects],
+  );
+
+  const updateInsertEffectParams = useCallback(
+    (channelId: string, effectId: string, params: Partial<InsertEffectParams>) => {
+      updateChannelInsertEffects(channelId, (effects) =>
+        effects.map((fx) =>
+          fx.id === effectId
+            ? { ...fx, params: { ...fx.params, ...params } }
+            : fx,
+        ),
+      );
+    },
+    [updateChannelInsertEffects],
+  );
+
+  const moveInsertEffect = useCallback(
+    (channelId: string, effectId: string, direction: 'up' | 'down') => {
+      updateChannelInsertEffects(channelId, (effects) => {
+        const idx = effects.findIndex((fx) => fx.id === effectId);
+        if (idx < 0) return effects;
+        const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= effects.length) return effects;
+        const arr = [...effects];
+        [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
+        return arr;
+      });
+    },
+    [updateChannelInsertEffects],
+  );
 
   // -----------------------------------------------------------------------
   // Automation actions
@@ -2035,6 +2179,7 @@ function useSequencer() {
     addPianoNote,
     deletePianoNote,
     updatePianoNote,
+    slicePianoNote,
     previewPianoNote,
     movePianoNotes,
     pastePianoNotes,
@@ -2082,6 +2227,12 @@ function useSequencer() {
     setSampleTrackReverbSend,
     setSampleTrackDelaySend,
     setSampleTrackFilterSend,
+    // Insert effects
+    addInsertEffect,
+    removeInsertEffect,
+    toggleInsertEffect,
+    updateInsertEffectParams,
+    moveInsertEffect,
     // Automation
     addAutomationLane,
     removeAutomationLane,
