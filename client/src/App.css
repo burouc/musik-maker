@@ -1896,6 +1896,11 @@
   overflow-y: hidden;
 }
 
+.piano-roll-body.panning,
+.piano-roll-body.panning * {
+  cursor: grabbing !important;
+}
+
 /* Step number header */
 .piano-roll-step-header {
   display: flex;

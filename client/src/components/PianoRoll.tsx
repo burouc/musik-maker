@@ -190,6 +190,11 @@ function PianoRoll({
   /** Clipboard: stores copied notes with positions relative to the selection origin */
   const clipboardRef = useRef<Omit<PianoNote, 'id'>[]>([]);
   const velocityLaneRef = useRef<HTMLDivElement>(null);
+  /** Refs for scroll containers (used by wheel + middle-click pan) */
+  const bodyRef = useRef<HTMLDivElement>(null);   // horizontal scroll
+  const scrollRef = useRef<HTMLDivElement>(null);  // vertical scroll
+  /** Middle-click pan state */
+  const panRef = useRef<{ active: boolean; startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
   /** Snap-to-grid resolution */
   const [snapResolution, setSnapResolution] = useState<SnapResolution>('1/16');
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -764,6 +769,67 @@ function PianoRoll({
     return () => window.removeEventListener('mouseup', onUp);
   }, []);
 
+  // ── Scroll wheel panning ─────────────────────────────────────────
+  // Vertical wheel scrolls the grid vertically; Shift+wheel scrolls horizontally.
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    const body = bodyRef.current;
+    const scroll = scrollRef.current;
+    if (!body || !scroll) return;
+
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      // Horizontal pan
+      e.preventDefault();
+      body.scrollLeft += e.shiftKey ? e.deltaY : e.deltaX;
+    } else {
+      // Vertical pan — let native scrolling handle it on .piano-roll-scroll,
+      // but if the event target is outside that container, forward it.
+      e.preventDefault();
+      scroll.scrollTop += e.deltaY;
+    }
+  }, []);
+
+  // ── Middle-click drag panning ────────────────────────────────────
+  const handlePanStart = useCallback((e: React.MouseEvent) => {
+    // Middle mouse button = 1
+    if (e.button !== 1) return;
+    e.preventDefault();
+    const body = bodyRef.current;
+    const scroll = scrollRef.current;
+    if (!body || !scroll) return;
+    panRef.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      scrollLeft: body.scrollLeft,
+      scrollTop: scroll.scrollTop,
+    };
+    body.classList.add('panning');
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const p = panRef.current;
+      if (!p?.active) return;
+      const body = bodyRef.current;
+      const scroll = scrollRef.current;
+      if (!body || !scroll) return;
+      body.scrollLeft = p.scrollLeft - (e.clientX - p.startX);
+      scroll.scrollTop = p.scrollTop - (e.clientY - p.startY);
+    };
+    const onUp = (e: MouseEvent) => {
+      if (e.button === 1 && panRef.current?.active) {
+        panRef.current = null;
+        bodyRef.current?.classList.remove('panning');
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
   return (
     <div className="piano-roll" style={zoomStyle}>
       <div className="piano-roll-header">
@@ -1134,7 +1200,12 @@ function PianoRoll({
         )}
       </div>
 
-      <div className="piano-roll-body">
+      <div
+        className="piano-roll-body"
+        ref={bodyRef}
+        onWheel={handleWheel}
+        onMouseDown={handlePanStart}
+      >
         {/* Step numbers header row */}
         <div className="piano-roll-step-header">
           <div className="piano-keyboard-spacer" />
@@ -1150,7 +1221,7 @@ function PianoRoll({
           </div>
         </div>
 
-        <div className="piano-roll-scroll">
+        <div className="piano-roll-scroll" ref={scrollRef}>
           {KEY_RANGE.map((midi) => {
             const black = isBlackKey(midi);
             const label = midiToLabel(midi);
