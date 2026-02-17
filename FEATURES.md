@@ -88,7 +88,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [x] **[P0]** Multiple oscillators with detune and mix
 - [ ] **[P1]** LFO modulation (route to pitch, filter, volume, pan)
 - [ ] **[P1]** Noise oscillator (white, pink)
-- [ ] **[P1]** Unison / voice stacking with spread
+- [x] **[P1]** Unison / voice stacking with spread
 - [ ] **[P1]** Preset system (save/load synth patches)
 - [ ] **[P2]** FM synthesis mode
 - [ ] **[P2]** Wavetable oscillator
