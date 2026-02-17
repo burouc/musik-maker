@@ -28,6 +28,8 @@ export interface Track {
   insertEffects: InsertEffect[];
   /** Per-send-channel send levels: { sendChannelId: 0–1 } */
   sends: Record<string, number>;
+  /** ID of the mixer track this channel routes to (null = direct to master) */
+  mixerTrackId: string | null;
 }
 
 export interface Pattern {
@@ -129,13 +131,16 @@ export interface DelaySettings {
 export type FilterType = 'lowpass' | 'highpass' | 'bandpass';
 
 /** Available insert effect types for mixer channel effect slots */
-export type InsertEffectType = 'filter' | 'reverb' | 'delay' | 'distortion' | 'chorus';
+export type InsertEffectType = 'filter' | 'reverb' | 'delay' | 'distortion' | 'chorus' | 'compressor';
 
 /** Maximum number of insert effect slots per mixer channel */
 export const MAX_INSERT_EFFECTS = 8;
 
 /** Maximum number of user-defined send channels (FX buses) */
 export const MAX_SEND_CHANNELS = 4;
+
+/** Maximum number of mixer tracks */
+export const MAX_MIXER_TRACKS = 16;
 
 /** A user-defined send/FX bus channel */
 export interface SendChannel {
@@ -147,6 +152,46 @@ export interface SendChannel {
   volume: number;
   /** Insert effect chain on this send bus */
   insertEffects: InsertEffect[];
+}
+
+/** A single band of a parametric EQ */
+export interface EQBand {
+  /** Whether this band is active */
+  enabled: boolean;
+  /** Center frequency in Hz (20–20000) */
+  frequency: number;
+  /** Gain in dB (−24 to +24) */
+  gain: number;
+  /** Q factor / bandwidth (0.1–18) */
+  q: number;
+  /** Filter type for this band */
+  type: EQBandType;
+}
+
+/** EQ band filter type */
+export type EQBandType = 'lowshelf' | 'peaking' | 'highshelf';
+
+/** Default 3-band EQ settings */
+export const DEFAULT_EQ_BANDS: EQBand[] = [
+  { enabled: true, frequency: 200, gain: 0, q: 1, type: 'lowshelf' },
+  { enabled: true, frequency: 1000, gain: 0, q: 1, type: 'peaking' },
+  { enabled: true, frequency: 5000, gain: 0, q: 1, type: 'highshelf' },
+];
+
+/** A numbered mixer track that channels can be routed to */
+export interface MixerTrack {
+  /** Unique identifier (e.g. "mixer-1") */
+  id: string;
+  /** Display name (e.g. "Mixer 1") */
+  name: string;
+  /** Output volume: 0–1 */
+  volume: number;
+  /** Stereo pan position: −1 (full left) to +1 (full right), 0 = center */
+  pan: number;
+  /** 3-band parametric EQ */
+  eqBands: EQBand[];
+  /** Whether the EQ is enabled (global bypass) */
+  eqEnabled: boolean;
 }
 
 /** Parameters for each insert effect type */
@@ -185,12 +230,26 @@ export interface ChorusEffectParams {
   mix: number;
 }
 
+export interface CompressorEffectParams {
+  /** Threshold in dB (−60 to 0) */
+  threshold: number;
+  /** Compression ratio (1–20) */
+  ratio: number;
+  /** Attack time in seconds (0.001–1) */
+  attack: number;
+  /** Release time in seconds (0.01–1) */
+  release: number;
+  /** Makeup gain in dB (0–40) */
+  gain: number;
+}
+
 export type InsertEffectParams =
   | FilterEffectParams
   | ReverbEffectParams
   | DelayEffectParams
   | DistortionEffectParams
-  | ChorusEffectParams;
+  | ChorusEffectParams
+  | CompressorEffectParams;
 
 /** A single insert effect slot on a mixer channel */
 export interface InsertEffect {
@@ -211,6 +270,7 @@ export const DEFAULT_EFFECT_PARAMS: Record<InsertEffectType, InsertEffectParams>
   delay: { time: 0.25, feedback: 0.3, mix: 0.3 } as DelayEffectParams,
   distortion: { drive: 20, outputGain: 0.7 } as DistortionEffectParams,
   chorus: { rate: 1.5, depth: 0.5, mix: 0.5 } as ChorusEffectParams,
+  compressor: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, gain: 0 } as CompressorEffectParams,
 };
 
 /** Filter parameters for the master filter effect */
@@ -322,6 +382,8 @@ export interface SampleTrack {
   insertEffects: InsertEffect[];
   /** Per-send-channel send levels: { sendChannelId: 0–1 } */
   sends: Record<string, number>;
+  /** ID of the mixer track this channel routes to (null = direct to master) */
+  mixerTrackId: string | null;
 }
 
 /** Per-channel automation target format: `${channelType}:${channelId}:${param}` */
@@ -385,6 +447,8 @@ export interface ProjectData {
   swing: number;
   /** User-defined send/FX bus channels */
   sendChannels: SendChannel[];
+  /** Mixer tracks for channel routing */
+  mixerTracks: MixerTrack[];
 }
 
 export type PlaybackMode = 'pattern' | 'song';
@@ -430,4 +494,6 @@ export interface SequencerState {
   swing: number;
   /** User-defined send/FX bus channels */
   sendChannels: SendChannel[];
+  /** Mixer tracks for channel routing */
+  mixerTracks: MixerTrack[];
 }

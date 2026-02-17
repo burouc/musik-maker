@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, SendChannel } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, CompressorEffectParams, SendChannel, MixerTrack, EQBand } from '../types';
 
 /** Accepted MIME types for sample loading */
 const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {
@@ -69,6 +69,12 @@ class AudioEngine {
   private sendChannelBuses: Map<string, { inputBus: GainNode; outputGain: GainNode; analyser: AnalyserNode }> = new Map();
   // Per-source-channel per-send-channel send gains: Map<`${sourceChannelId}:${sendChannelId}`, GainNode>
   private sendChannelSendGains: Map<string, GainNode> = new Map();
+
+  // Mixer tracks: channels can route through these instead of directly to master
+  // Each mixer track has: inputGain → [eq bands] → panner → analyser → masterGain
+  private mixerTrackNodes: Map<string, { inputGain: GainNode; eqBands: BiquadFilterNode[]; eqEnabled: boolean; panner: StereoPannerNode; analyser: AnalyserNode }> = new Map();
+  // Track which mixer track each channel is routed to (channelId → mixerTrackId)
+  private channelMixerRouting: Map<string, string> = new Map();
 
   constructor() {
     this.context = new AudioContext();
@@ -540,7 +546,7 @@ class AudioEngine {
     if (effects.length === 0) {
       // No insert effects: direct panner → analyser + sends
       panner.connect(analyser);
-      analyser.connect(this.masterGain);
+      analyser.connect(this.getChannelOutputDestination(channelId));
       if (reverbSend) { panner.connect(reverbSend); }
       if (delaySend) { panner.connect(delaySend); }
       if (filterSend) { panner.connect(filterSend); }
@@ -597,7 +603,7 @@ class AudioEngine {
 
     // Final output → analyser + sends
     prevOutput.connect(analyser);
-    analyser.connect(this.masterGain);
+    analyser.connect(this.getChannelOutputDestination(channelId));
     if (reverbSend) { prevOutput.connect(reverbSend); }
     if (delaySend) { prevOutput.connect(delaySend); }
     if (filterSend) { prevOutput.connect(filterSend); }
@@ -636,6 +642,8 @@ class AudioEngine {
         return this.createDistortionEffect(fx.params as DistortionEffectParams);
       case 'chorus':
         return this.createChorusEffect(fx.params as ChorusEffectParams);
+      case 'compressor':
+        return this.createCompressorEffect(fx.params as CompressorEffectParams);
     }
   }
 
@@ -761,6 +769,24 @@ class AudioEngine {
     dryGain.connect(outputMerge);
 
     return { nodes: [inputSplitter, delay, lfo, lfoGain, wetGain, dryGain, outputMerge], inputNode: inputSplitter, outputNode: outputMerge };
+  }
+
+  private createCompressorEffect(params: CompressorEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const compressor = this.context.createDynamicsCompressor();
+    compressor.threshold.value = Math.max(-60, Math.min(0, params.threshold));
+    compressor.ratio.value = Math.max(1, Math.min(20, params.ratio));
+    compressor.attack.value = Math.max(0.001, Math.min(1, params.attack));
+    compressor.release.value = Math.max(0.01, Math.min(1, params.release));
+    // knee fixed at a moderate value for musical response
+    compressor.knee.value = 6;
+
+    const makeupGain = this.context.createGain();
+    // Convert dB to linear gain
+    makeupGain.gain.value = Math.pow(10, Math.max(0, Math.min(40, params.gain)) / 20);
+
+    compressor.connect(makeupGain);
+
+    return { nodes: [compressor, makeupGain], inputNode: compressor, outputNode: makeupGain };
   }
 
   // ---------------------------------------------------------------------------
@@ -926,6 +952,166 @@ class AudioEngine {
       panner: bus.inputBus as unknown as StereoPannerNode, // placeholder, not used for sends
       analyser: bus.analyser,
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mixer tracks (channel routing)
+  // ---------------------------------------------------------------------------
+
+  /** Create a mixer track with gain, EQ, panner, and analyser. */
+  ensureMixerTrack(mixerTrackId: string, volume: number = 1, pan: number = 0, eqBands?: EQBand[], eqEnabled: boolean = true): void {
+    if (this.mixerTrackNodes.has(mixerTrackId)) return;
+
+    const inputGain = this.context.createGain();
+    inputGain.gain.value = Math.max(0, Math.min(1, volume));
+
+    // Create 3-band parametric EQ
+    const eqNodes: BiquadFilterNode[] = [];
+    const bandDefaults: EQBand[] = eqBands ?? [
+      { enabled: true, frequency: 200, gain: 0, q: 1, type: 'lowshelf' },
+      { enabled: true, frequency: 1000, gain: 0, q: 1, type: 'peaking' },
+      { enabled: true, frequency: 5000, gain: 0, q: 1, type: 'highshelf' },
+    ];
+    for (const band of bandDefaults) {
+      const filter = this.context.createBiquadFilter();
+      filter.type = band.type as BiquadFilterType;
+      filter.frequency.value = band.frequency;
+      filter.gain.value = (band.enabled && eqEnabled) ? band.gain : 0;
+      filter.Q.value = band.q;
+      eqNodes.push(filter);
+    }
+
+    const panner = this.context.createStereoPanner();
+    panner.pan.value = Math.max(-1, Math.min(1, pan));
+
+    const analyser = this.context.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.3;
+
+    // Signal chain: inputGain → eq1 → eq2 → eq3 → panner → analyser → masterGain
+    let prevNode: AudioNode = inputGain;
+    for (const eq of eqNodes) {
+      prevNode.connect(eq);
+      prevNode = eq;
+    }
+    prevNode.connect(panner);
+    panner.connect(analyser);
+    analyser.connect(this.masterGain);
+
+    this.mixerTrackNodes.set(mixerTrackId, { inputGain, eqBands: eqNodes, eqEnabled, panner, analyser });
+  }
+
+  /** Remove a mixer track and re-route any channels using it back to master. */
+  removeMixerTrack(mixerTrackId: string): void {
+    const nodes = this.mixerTrackNodes.get(mixerTrackId);
+    if (!nodes) return;
+
+    // Re-route any channels assigned to this mixer track back to master
+    for (const [channelId, routedTo] of this.channelMixerRouting) {
+      if (routedTo === mixerTrackId) {
+        this.channelMixerRouting.delete(channelId);
+        this.rewireChannelOutput(channelId, null);
+      }
+    }
+
+    nodes.inputGain.disconnect();
+    for (const eq of nodes.eqBands) {
+      eq.disconnect();
+    }
+    nodes.panner.disconnect();
+    nodes.analyser.disconnect();
+    this.mixerTrackNodes.delete(mixerTrackId);
+  }
+
+  /** Set the volume of a mixer track. */
+  setMixerTrackVolume(mixerTrackId: string, volume: number): void {
+    const nodes = this.mixerTrackNodes.get(mixerTrackId);
+    if (nodes) {
+      nodes.inputGain.gain.value = Math.max(0, Math.min(1, volume));
+    }
+  }
+
+  /** Set the pan of a mixer track. */
+  setMixerTrackPan(mixerTrackId: string, pan: number): void {
+    const nodes = this.mixerTrackNodes.get(mixerTrackId);
+    if (nodes) {
+      nodes.panner.pan.value = Math.max(-1, Math.min(1, pan));
+    }
+  }
+
+  /** Get peak level for a mixer track. */
+  getMixerTrackLevel(mixerTrackId: string): number {
+    const nodes = this.mixerTrackNodes.get(mixerTrackId);
+    if (!nodes) return 0;
+    return this.readPeak(nodes.analyser);
+  }
+
+  /** Update a single EQ band on a mixer track. */
+  setMixerTrackEQBand(mixerTrackId: string, bandIndex: number, band: EQBand): void {
+    const nodes = this.mixerTrackNodes.get(mixerTrackId);
+    if (!nodes || bandIndex < 0 || bandIndex >= nodes.eqBands.length) return;
+    const filter = nodes.eqBands[bandIndex];
+    filter.type = band.type as BiquadFilterType;
+    filter.frequency.value = Math.max(20, Math.min(20000, band.frequency));
+    filter.Q.value = Math.max(0.1, Math.min(18, band.q));
+    filter.gain.value = (band.enabled && nodes.eqEnabled) ? Math.max(-24, Math.min(24, band.gain)) : 0;
+  }
+
+  /** Toggle the entire EQ on/off for a mixer track. */
+  setMixerTrackEQEnabled(mixerTrackId: string, enabled: boolean, bands: EQBand[]): void {
+    const nodes = this.mixerTrackNodes.get(mixerTrackId);
+    if (!nodes) return;
+    nodes.eqEnabled = enabled;
+    for (let i = 0; i < nodes.eqBands.length && i < bands.length; i++) {
+      nodes.eqBands[i].gain.value = (enabled && bands[i].enabled) ? bands[i].gain : 0;
+    }
+  }
+
+  /**
+   * Route a channel to a mixer track (or back to master if mixerTrackId is null).
+   * This changes where the channel's analyser output connects to.
+   */
+  setChannelMixerRouting(channelId: string, mixerTrackId: string | null): void {
+    const prevRouting = this.channelMixerRouting.get(channelId) ?? null;
+    if (prevRouting === mixerTrackId) return;
+
+    if (mixerTrackId) {
+      this.channelMixerRouting.set(channelId, mixerTrackId);
+    } else {
+      this.channelMixerRouting.delete(channelId);
+    }
+
+    this.rewireChannelOutput(channelId, mixerTrackId);
+  }
+
+  /** Get the output destination for a channel (mixer track input or master gain). */
+  private getChannelOutputDestination(channelId: string): AudioNode {
+    const mixerTrackId = this.channelMixerRouting.get(channelId);
+    if (mixerTrackId) {
+      const nodes = this.mixerTrackNodes.get(mixerTrackId);
+      if (nodes) return nodes.inputGain;
+    }
+    return this.masterGain;
+  }
+
+  /**
+   * Rewire a channel's analyser output to either a mixer track or master.
+   * The channel's signal chain is: panner → [insert FX] → analyser → [destination]
+   * We change only the analyser's output destination.
+   */
+  private rewireChannelOutput(channelId: string, mixerTrackId: string | null): void {
+    const isInstrument = this.channelAnalysers.has(channelId as InstrumentName);
+    const analyser = isInstrument
+      ? this.channelAnalysers.get(channelId as InstrumentName)
+      : this.sampleAnalysers.get(channelId);
+
+    if (!analyser) return;
+
+    // Disconnect analyser from its current output
+    analyser.disconnect();
+
+    // Reconnect to the new destination
+    analyser.connect(this.getChannelOutputDestination(channelId));
   }
 
   /**

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, SendChannel } from '../types';
-import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS } from '../types';
+import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, CompressorEffectParams, SendChannel, MixerTrack as MixerTrackType, EQBand, EQBandType } from '../types';
+import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS, MAX_MIXER_TRACKS } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
 const DELAY_SYNC_OPTIONS: { value: DelaySync; label: string }[] = [
@@ -24,6 +24,7 @@ const INSERT_EFFECT_OPTIONS: { value: InsertEffectType; label: string }[] = [
   { value: 'delay', label: 'Delay' },
   { value: 'distortion', label: 'Distort' },
   { value: 'chorus', label: 'Chorus' },
+  { value: 'compressor', label: 'Compress' },
 ];
 
 interface MixerProps {
@@ -70,6 +71,14 @@ interface MixerProps {
   onToggleSendChannelInsertEffect: (sendChannelId: string, effectId: string) => void;
   onUpdateSendChannelInsertEffectParams: (sendChannelId: string, effectId: string, params: Partial<InsertEffectParams>) => void;
   onMoveSendChannelInsertEffect: (sendChannelId: string, effectId: string, direction: 'up' | 'down') => void;
+  mixerTracks: MixerTrackType[];
+  onAddMixerTrack: () => void;
+  onRemoveMixerTrack: (mixerTrackId: string) => void;
+  onRenameMixerTrack: (mixerTrackId: string, name: string) => void;
+  onSetMixerTrackVolume: (mixerTrackId: string, volume: number) => void;
+  onSetMixerTrackPan: (mixerTrackId: string, pan: number) => void;
+  onSetMixerTrackEQBand: (mixerTrackId: string, bandIndex: number, band: EQBand) => void;
+  onSetMixerTrackEQEnabled: (mixerTrackId: string, enabled: boolean) => void;
 }
 
 /** Number of LED segments in each VU meter */
@@ -243,6 +252,43 @@ const InsertEffectEditor: React.FC<{
           </>
         );
       }
+      case 'compressor': {
+        const p = effect.params as CompressorEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Thresh</label>
+              <input type="range" min={-60} max={0} step={0.5} value={p.threshold}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { threshold: parseFloat(e.target.value) })} />
+              <span>{p.threshold.toFixed(1)}dB</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Ratio</label>
+              <input type="range" min={1} max={20} step={0.5} value={p.ratio}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { ratio: parseFloat(e.target.value) })} />
+              <span>{p.ratio.toFixed(1)}:1</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Attack</label>
+              <input type="range" min={0.001} max={1} step={0.001} value={p.attack}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { attack: parseFloat(e.target.value) })} />
+              <span>{(p.attack * 1000).toFixed(0)}ms</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Release</label>
+              <input type="range" min={0.01} max={1} step={0.01} value={p.release}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { release: parseFloat(e.target.value) })} />
+              <span>{(p.release * 1000).toFixed(0)}ms</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Gain</label>
+              <input type="range" min={0} max={40} step={0.5} value={p.gain}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { gain: parseFloat(e.target.value) })} />
+              <span>{p.gain > 0 ? '+' : ''}{p.gain.toFixed(1)}dB</span>
+            </div>
+          </>
+        );
+      }
     }
   };
 
@@ -339,6 +385,108 @@ const InsertEffectRack: React.FC<{
 });
 InsertEffectRack.displayName = 'InsertEffectRack';
 
+const EQ_BAND_TYPE_OPTIONS: { value: EQBandType; label: string }[] = [
+  { value: 'lowshelf', label: 'Low Shelf' },
+  { value: 'peaking', label: 'Peak' },
+  { value: 'highshelf', label: 'High Shelf' },
+];
+
+const EQ_BAND_LABELS = ['Low', 'Mid', 'High'];
+
+/** Compact 3-band parametric EQ editor for a mixer track */
+const MixerTrackEQ: React.FC<{
+  mixerTrackId: string;
+  bands: EQBand[];
+  enabled: boolean;
+  onSetBand: (mixerTrackId: string, bandIndex: number, band: EQBand) => void;
+  onSetEnabled: (mixerTrackId: string, enabled: boolean) => void;
+}> = React.memo(({ mixerTrackId, bands, enabled, onSetBand, onSetEnabled }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={`mixer-eq${enabled ? '' : ' bypassed'}`}>
+      <div className="mixer-eq-header">
+        <button
+          className={`mixer-eq-power${enabled ? ' active' : ''}`}
+          onClick={() => onSetEnabled(mixerTrackId, !enabled)}
+          title={enabled ? 'Bypass EQ' : 'Enable EQ'}
+        />
+        <button
+          className="mixer-eq-label"
+          onClick={() => setExpanded(!expanded)}
+          title="Expand/collapse EQ"
+        >
+          EQ
+        </button>
+      </div>
+      {expanded && (
+        <div className="mixer-eq-bands">
+          {bands.map((band, i) => (
+            <div key={i} className={`mixer-eq-band${band.enabled ? '' : ' bypassed'}`}>
+              <div className="mixer-eq-band-header">
+                <button
+                  className={`mixer-eq-band-power${band.enabled ? ' active' : ''}`}
+                  onClick={() => onSetBand(mixerTrackId, i, { ...band, enabled: !band.enabled })}
+                  title={band.enabled ? 'Disable band' : 'Enable band'}
+                />
+                <span className="mixer-eq-band-label">{EQ_BAND_LABELS[i] ?? `Band ${i + 1}`}</span>
+              </div>
+              <div className="mixer-eq-band-param">
+                <label>Type</label>
+                <select
+                  value={band.type}
+                  onChange={(e) => onSetBand(mixerTrackId, i, { ...band, type: e.target.value as EQBandType })}
+                >
+                  {EQ_BAND_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mixer-eq-band-param">
+                <label>Freq</label>
+                <input
+                  type="range"
+                  min={20}
+                  max={20000}
+                  step={1}
+                  value={band.frequency}
+                  onChange={(e) => onSetBand(mixerTrackId, i, { ...band, frequency: parseFloat(e.target.value) })}
+                />
+                <span>{band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : Math.round(band.frequency)}Hz</span>
+              </div>
+              <div className="mixer-eq-band-param">
+                <label>Gain</label>
+                <input
+                  type="range"
+                  min={-24}
+                  max={24}
+                  step={0.5}
+                  value={band.gain}
+                  onChange={(e) => onSetBand(mixerTrackId, i, { ...band, gain: parseFloat(e.target.value) })}
+                />
+                <span>{band.gain > 0 ? '+' : ''}{band.gain.toFixed(1)}dB</span>
+              </div>
+              <div className="mixer-eq-band-param">
+                <label>Q</label>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={18}
+                  step={0.1}
+                  value={band.q}
+                  onChange={(e) => onSetBand(mixerTrackId, i, { ...band, q: parseFloat(e.target.value) })}
+                />
+                <span>{band.q.toFixed(1)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+MixerTrackEQ.displayName = 'MixerTrackEQ';
+
 const Mixer: React.FC<MixerProps> = ({
   tracks,
   sampleTracks,
@@ -383,6 +531,14 @@ const Mixer: React.FC<MixerProps> = ({
   onToggleSendChannelInsertEffect,
   onUpdateSendChannelInsertEffectParams,
   onMoveSendChannelInsertEffect,
+  mixerTracks,
+  onAddMixerTrack,
+  onRemoveMixerTrack,
+  onRenameMixerTrack,
+  onSetMixerTrackVolume,
+  onSetMixerTrackPan,
+  onSetMixerTrackEQBand,
+  onSetMixerTrackEQEnabled,
 }) => {
   const rafRef = useRef<number>(0);
   const mixerRef = useRef<HTMLDivElement>(null);
@@ -405,6 +561,8 @@ const Mixer: React.FC<MixerProps> = ({
         level = audioEngine.getMasterLevel();
       } else if (id.startsWith('send-')) {
         level = audioEngine.getSendChannelLevel(id);
+      } else if (id.startsWith('mixer-')) {
+        level = audioEngine.getMixerTrackLevel(id);
       } else if (id.startsWith('strack-')) {
         level = audioEngine.getSampleChannelLevel(id);
       } else {
@@ -851,6 +1009,65 @@ const Mixer: React.FC<MixerProps> = ({
             title="Add FX bus send channel"
           >
             + FX Bus
+          </button>
+        </div>
+      )}
+
+      {mixerTracks.map((mt) => (
+        <div key={mt.id} className="mixer-channel mixer-track-channel">
+          <label className="mixer-channel-name mixer-track-title">{mt.name}</label>
+          <div className="mixer-meter-and-slider">
+            <VuMeter meterId={mt.id} />
+            <input
+              type="range"
+              className="mixer-volume-slider"
+              min={0}
+              max={1}
+              step={0.01}
+              value={mt.volume}
+              onChange={(e) => onSetMixerTrackVolume(mt.id, parseFloat(e.target.value))}
+            />
+          </div>
+          <span className="mixer-volume-display">
+            {Math.round(mt.volume * 100)}%
+          </span>
+          <input
+            type="range"
+            className="mixer-pan-slider"
+            min={-1}
+            max={1}
+            step={0.01}
+            value={mt.pan}
+            onChange={(e) => onSetMixerTrackPan(mt.id, parseFloat(e.target.value))}
+          />
+          <span className="mixer-pan-display">
+            {mt.pan === 0 ? 'C' : mt.pan < 0 ? `L${Math.round(Math.abs(mt.pan) * 100)}` : `R${Math.round(mt.pan * 100)}`}
+          </span>
+          <MixerTrackEQ
+            mixerTrackId={mt.id}
+            bands={mt.eqBands}
+            enabled={mt.eqEnabled}
+            onSetBand={onSetMixerTrackEQBand}
+            onSetEnabled={onSetMixerTrackEQEnabled}
+          />
+          <button
+            className="mixer-btn clear-btn"
+            onClick={() => onRemoveMixerTrack(mt.id)}
+            title="Remove mixer track"
+          >
+            DEL
+          </button>
+        </div>
+      ))}
+
+      {mixerTracks.length < MAX_MIXER_TRACKS && (
+        <div className="mixer-channel mixer-add-track-channel">
+          <button
+            className="mixer-add-send-btn"
+            onClick={onAddMixerTrack}
+            title="Add mixer track"
+          >
+            + Mixer Track
           </button>
         </div>
       )}

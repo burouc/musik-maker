@@ -250,7 +250,7 @@
           "id": "fx-04",
           "priority": "P1",
           "title": "Compressor (threshold, ratio, attack, release, gain)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "fx-05",
