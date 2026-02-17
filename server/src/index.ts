@@ -14,15 +14,25 @@ app.use(express.json({ limit: '10mb' }));
 // -----------------------------------------------------------------------
 
 const DATA_DIR = path.join(import.meta.dirname, '../../data/projects');
+const PRESETS_DIR = path.join(import.meta.dirname, '../../data/presets');
 
 function ensureDataDir(): void {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function ensurePresetsDir(): void {
+  fs.mkdirSync(PRESETS_DIR, { recursive: true });
 }
 
 function getProjectPath(id: string): string {
   // Sanitize id to prevent path traversal
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '');
   return path.join(DATA_DIR, `${safeId}.json`);
+}
+
+function getPresetPath(id: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '');
+  return path.join(PRESETS_DIR, `${safeId}.json`);
 }
 
 // -----------------------------------------------------------------------
@@ -79,6 +89,62 @@ app.delete('/api/projects/:id', (req, res) => {
   const filePath = getProjectPath(req.params.id);
   if (!fs.existsSync(filePath)) {
     res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+  fs.unlinkSync(filePath);
+  res.json({ ok: true });
+});
+
+// -----------------------------------------------------------------------
+// Synth presets storage
+// -----------------------------------------------------------------------
+
+// List all saved presets (metadata only)
+app.get('/api/presets', (_req, res) => {
+  ensurePresetsDir();
+  const files = fs.readdirSync(PRESETS_DIR).filter((f) => f.endsWith('.json'));
+  const presets = files.map((f) => {
+    const raw = fs.readFileSync(path.join(PRESETS_DIR, f), 'utf-8');
+    const data = JSON.parse(raw);
+    return { id: data.id, name: data.name, updatedAt: data.updatedAt, createdAt: data.createdAt };
+  });
+  presets.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  res.json(presets);
+});
+
+// Get a single preset
+app.get('/api/presets/:id', (req, res) => {
+  const filePath = getPresetPath(req.params.id);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: 'Preset not found' });
+    return;
+  }
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  res.json(JSON.parse(raw));
+});
+
+// Create or update a preset
+app.put('/api/presets/:id', (req, res) => {
+  ensurePresetsDir();
+  const preset = req.body;
+  if (!preset || !preset.id || !preset.name || !preset.settings) {
+    res.status(400).json({ error: 'Invalid preset data' });
+    return;
+  }
+  preset.updatedAt = new Date().toISOString();
+  const filePath = getPresetPath(preset.id);
+  if (!fs.existsSync(filePath)) {
+    preset.createdAt = preset.updatedAt;
+  }
+  fs.writeFileSync(filePath, JSON.stringify(preset, null, 2), 'utf-8');
+  res.json({ id: preset.id, name: preset.name, updatedAt: preset.updatedAt });
+});
+
+// Delete a preset
+app.delete('/api/presets/:id', (req, res) => {
+  const filePath = getPresetPath(req.params.id);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: 'Preset not found' });
     return;
   }
   fs.unlinkSync(filePath);

@@ -420,6 +420,15 @@ export interface SynthSettings {
   unisonPan: number;
 }
 
+/** A saved synth preset (reusable patch) */
+export interface SynthPreset {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  settings: SynthSettings;
+}
+
 /** Supported audio file formats for sample loading */
 export type SampleFormat = 'wav' | 'mp3' | 'ogg';
 

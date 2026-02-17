@@ -15,6 +15,7 @@ import type {
   DelaySettings,
   FilterSettings,
   SynthSettings,
+  SynthPreset,
   AutomationLane,
   AutomationPoint,
   AutomationTarget,
@@ -2505,6 +2506,56 @@ function useSequencer() {
     setState((prev) => prev.projectId === id ? { ...prev, projectId: null } : prev);
   }, [API_BASE]);
 
+  // -----------------------------------------------------------------------
+  // Synth presets
+  // -----------------------------------------------------------------------
+
+  const listPresets = useCallback(async (): Promise<{ id: string; name: string; updatedAt: string }[]> => {
+    const res = await fetch(`${API_BASE}/api/presets`);
+    if (!res.ok) throw new Error('Failed to list presets');
+    return res.json();
+  }, [API_BASE]);
+
+  const savePreset = useCallback(async (name: string): Promise<SynthPreset> => {
+    const activeP = getActivePattern(stateRef.current);
+    if (!activeP) throw new Error('No active pattern');
+    const id = `preset-${Date.now()}`;
+    const preset: SynthPreset = {
+      id,
+      name,
+      createdAt: '',
+      updatedAt: '',
+      settings: { ...activeP.synthSettings },
+    };
+    const res = await fetch(`${API_BASE}/api/presets/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(preset),
+    });
+    if (!res.ok) throw new Error('Failed to save preset');
+    return { ...preset, ...(await res.json()) };
+  }, [API_BASE]);
+
+  const loadPreset = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/presets/${id}`);
+    if (!res.ok) throw new Error('Failed to load preset');
+    const preset: SynthPreset = await res.json();
+    pushUndo();
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? { ...pattern, synthSettings: { ...pattern.synthSettings, ...preset.settings } }
+          : pattern,
+      ),
+    }));
+  }, [API_BASE, pushUndo]);
+
+  const deletePreset = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/api/presets/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete preset');
+  }, [API_BASE]);
+
   // Derive active pattern tracks for component consumption
   const activePattern = getActivePattern(state);
   const tracks = activePattern?.tracks ?? [];
@@ -2628,6 +2679,11 @@ function useSequencer() {
     listProjects,
     deleteProject: deleteProject,
     setProjectName,
+    // Synth presets
+    listPresets,
+    savePreset,
+    loadPreset,
+    deletePreset: deletePreset,
   };
 }
 

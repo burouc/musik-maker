@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import type { PianoRollData, PianoNote, PianoRollTool, SynthSettings, OscillatorType, SnapResolution, LfoWaveform, LfoTarget, LfoSettings } from '../types';
+import type { PianoRollData, PianoNote, PianoRollTool, SynthSettings, SynthPreset, OscillatorType, SnapResolution, LfoWaveform, LfoTarget, LfoSettings } from '../types';
 
 /** Note names in chromatic order */
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -198,6 +198,10 @@ interface PianoRollProps {
   onPasteNotes: (notes: Omit<PianoNote, 'id'>[]) => void;
   onUpdateNoteVelocity: (noteId: string, velocity: number) => void;
   onSynthSettingsChange: (params: Partial<SynthSettings>) => void;
+  onListPresets: () => Promise<{ id: string; name: string; updatedAt: string }[]>;
+  onSavePreset: (name: string) => Promise<SynthPreset>;
+  onLoadPreset: (id: string) => Promise<void>;
+  onDeletePreset: (id: string) => Promise<void>;
 }
 
 function PianoRoll({
@@ -215,6 +219,10 @@ function PianoRoll({
   onPasteNotes,
   onUpdateNoteVelocity,
   onSynthSettingsChange,
+  onListPresets,
+  onSavePreset,
+  onLoadPreset,
+  onDeletePreset,
 }: PianoRollProps) {
   const [activeTool, setActiveTool] = useState<PianoRollTool>('draw');
   /** Erase drag: true while the erase tool is actively dragging */
@@ -243,6 +251,58 @@ function PianoRoll({
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [hZoom, setHZoom] = useState(DEFAULT_H_ZOOM);
   const [vZoom, setVZoom] = useState(DEFAULT_V_ZOOM);
+
+  // Preset state
+  const [presetList, setPresetList] = useState<{ id: string; name: string; updatedAt: string }[]>([]);
+  const [presetName, setPresetName] = useState('');
+  const [presetOpen, setPresetOpen] = useState(false);
+  const [presetStatus, setPresetStatus] = useState<string | null>(null);
+
+  const refreshPresets = useCallback(async () => {
+    try {
+      const list = await onListPresets();
+      setPresetList(list);
+    } catch { /* ignore */ }
+  }, [onListPresets]);
+
+  const handleSavePreset = useCallback(async () => {
+    const name = presetName.trim();
+    if (!name) return;
+    try {
+      await onSavePreset(name);
+      setPresetName('');
+      setPresetStatus('Saved');
+      setTimeout(() => setPresetStatus(null), 2000);
+      refreshPresets();
+    } catch {
+      setPresetStatus('Error');
+      setTimeout(() => setPresetStatus(null), 2000);
+    }
+  }, [presetName, onSavePreset, refreshPresets]);
+
+  const handleLoadPreset = useCallback(async (id: string) => {
+    try {
+      await onLoadPreset(id);
+      setPresetOpen(false);
+      setPresetStatus('Loaded');
+      setTimeout(() => setPresetStatus(null), 2000);
+    } catch {
+      setPresetStatus('Error');
+      setTimeout(() => setPresetStatus(null), 2000);
+    }
+  }, [onLoadPreset]);
+
+  const handleDeletePreset = useCallback(async (id: string) => {
+    try {
+      await onDeletePreset(id);
+      refreshPresets();
+    } catch { /* ignore */ }
+  }, [onDeletePreset, refreshPresets]);
+
+  const handleTogglePresetBrowser = useCallback(() => {
+    if (!presetOpen) refreshPresets();
+    setPresetOpen((prev) => !prev);
+  }, [presetOpen, refreshPresets]);
 
   const zoomStyle = useMemo(
     () =>
@@ -1076,6 +1136,41 @@ function PianoRoll({
         </div>
 
         <div className="synth-controls">
+          <div className="synth-preset-bar">
+            <input
+              className="synth-preset-name"
+              type="text"
+              placeholder="Preset name…"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSavePreset(); }}
+            />
+            <button className="synth-preset-btn" onClick={handleSavePreset} disabled={!presetName.trim()} title="Save current settings as preset">
+              Save
+            </button>
+            <button className={`synth-preset-btn${presetOpen ? ' active' : ''}`} onClick={handleTogglePresetBrowser} title="Browse presets">
+              Presets
+            </button>
+            {presetStatus && <span className="synth-preset-status">{presetStatus}</span>}
+          </div>
+          {presetOpen && (
+            <div className="synth-preset-browser">
+              {presetList.length === 0 ? (
+                <div className="synth-preset-empty">No saved presets</div>
+              ) : (
+                presetList.map((p) => (
+                  <div key={p.id} className="synth-preset-item">
+                    <button className="synth-preset-load" onClick={() => handleLoadPreset(p.id)} title={`Load "${p.name}"`}>
+                      {p.name}
+                    </button>
+                    <button className="synth-preset-delete" onClick={() => handleDeletePreset(p.id)} title="Delete preset">
+                      ×
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
           <div className="synth-control-group">
             <label className="synth-label">OSC 1</label>
             <div className="synth-osc-buttons">

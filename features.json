@@ -340,7 +340,7 @@
           "id": "sy-08",
           "priority": "P1",
           "title": "Preset system (save/load synth patches)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "sy-09",

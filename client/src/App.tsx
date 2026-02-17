@@ -133,6 +133,11 @@ function App() {
     listProjects,
     deleteProject: deleteServerProject,
     setProjectName,
+    // Synth presets
+    listPresets,
+    savePreset,
+    loadPreset,
+    deletePreset: deleteServerPreset,
   } = useSequencer();
 
   const [activeTab, setActiveTab] = useState<ViewTab>('channel-rack');
@@ -398,6 +403,10 @@ function App() {
               onPasteNotes={pastePianoNotes}
               onUpdateNoteVelocity={updatePianoNoteVelocity}
               onSynthSettingsChange={setSynthSettings}
+              onListPresets={listPresets}
+              onSavePreset={savePreset}
+              onLoadPreset={loadPreset}
+              onDeletePreset={deleteServerPreset}
             />
           )}
         </ResizablePanel>

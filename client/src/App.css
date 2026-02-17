@@ -2433,6 +2433,131 @@
   flex-wrap: wrap;
 }
 
+.synth-preset-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.synth-preset-name {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  width: 140px;
+  outline: none;
+}
+
+.synth-preset-name:focus {
+  border-color: var(--accent);
+}
+
+.synth-preset-btn {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.synth-preset-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.synth-preset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.synth-preset-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.synth-preset-status {
+  font-size: 0.6rem;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  margin-left: 4px;
+}
+
+.synth-preset-browser {
+  width: 100%;
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.synth-preset-empty {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  padding: 6px;
+  text-align: center;
+}
+
+.synth-preset-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.synth-preset-load {
+  flex: 1;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.synth-preset-load:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.synth-preset-delete {
+  font-size: 0.75rem;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.synth-preset-delete:hover {
+  background: rgba(255, 60, 60, 0.2);
+  color: #ff5555;
+}
+
 .synth-control-group {
   display: flex;
   align-items: center;
