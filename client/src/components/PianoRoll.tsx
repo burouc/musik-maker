@@ -75,12 +75,6 @@ function snapStepSize(resolution: SnapResolution): number {
   }
 }
 
-/** Snap a step value to the nearest grid position */
-function snapToGrid(step: number, resolution: SnapResolution): number {
-  const size = snapStepSize(resolution);
-  return Math.round(step / size) * size;
-}
-
 /** Snap a step value down to the nearest grid position (floor) */
 function snapFloor(step: number, resolution: SnapResolution): number {
   const size = snapStepSize(resolution);
@@ -106,15 +100,6 @@ const TOOLS: { id: PianoRollTool; label: string; shortcut: string; title: string
   { id: 'paint', label: 'Paint', shortcut: 'P', title: 'Paint tool (P) — Click/drag to paint notes continuously' },
   { id: 'erase', label: 'Erase', shortcut: 'E', title: 'Erase tool (E) — Click/drag to erase notes' },
 ];
-
-/** Cursor classes per tool */
-const TOOL_CURSOR_CLASS: Record<PianoRollTool, string> = {
-  draw: 'tool-draw',
-  select: 'tool-select',
-  slice: 'tool-slice',
-  paint: 'tool-paint',
-  erase: 'tool-erase',
-};
 
 interface DragState {
   pitch: number;

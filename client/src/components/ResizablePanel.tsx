@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, ReactNode } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import type { ReactNode } from 'react';
 import PanelDivider from './PanelDivider';
 
 interface ResizablePanelProps {

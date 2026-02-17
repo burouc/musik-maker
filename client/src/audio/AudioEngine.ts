@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, MasterLimiterSettings, SynthSettings, OscillatorType, LfoSettings, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, SendChannel, MixerTrack, EQBand } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, MasterLimiterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, EQBand } from '../types';
 
 /** Accepted MIME types for sample loading */
 const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {
@@ -21,7 +21,6 @@ class AudioEngine {
 
   // Master bus limiter (DynamicsCompressor configured as a brickwall limiter)
   private masterLimiter: DynamicsCompressorNode;
-  private masterLimiterEnabled: boolean = true;
 
   // Reverb send/return bus
   private reverbSendGains: Map<InstrumentName, GainNode> = new Map();
@@ -92,7 +91,6 @@ class AudioEngine {
     this.masterLimiter.attack.value = 0.001;
     this.masterLimiter.release.value = 0.1;
     this.masterLimiter.knee.value = 0;
-    this.masterLimiterEnabled = true;
 
     // Master analyser sits between limiter and destination
     this.masterAnalyser = this.context.createAnalyser();
@@ -615,7 +613,6 @@ class AudioEngine {
   /** Update the master bus limiter settings. */
   setMasterLimiter(params: Partial<MasterLimiterSettings>): void {
     if (params.enabled !== undefined) {
-      this.masterLimiterEnabled = params.enabled;
       // Rewire: masterGain → (limiter | bypass) → masterAnalyser
       this.masterGain.disconnect();
       if (params.enabled) {
@@ -1409,7 +1406,7 @@ class AudioEngine {
    * The channel's signal chain is: panner → [insert FX] → analyser → [destination]
    * We change only the analyser's output destination.
    */
-  private rewireChannelOutput(channelId: string, mixerTrackId: string | null): void {
+  private rewireChannelOutput(channelId: string, _mixerTrackId: string | null): void {
     const isInstrument = this.channelAnalysers.has(channelId as InstrumentName);
     const analyser = isInstrument
       ? this.channelAnalysers.get(channelId as InstrumentName)

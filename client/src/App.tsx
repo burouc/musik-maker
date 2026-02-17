@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import useSequencer from './hooks/useSequencer';
 import StepSequencer from './components/StepSequencer';
 import TransportControls from './components/TransportControls';
@@ -9,7 +9,7 @@ import Arrangement from './components/Arrangement';
 import AutomationLanes from './components/AutomationLanes';
 import SampleBrowser from './components/SampleBrowser';
 import ResizablePanel from './components/ResizablePanel';
-import type { ViewTab, AutomationTarget, ChannelAutomationParam } from './types';
+import type { ViewTab, AutomationTarget } from './types';
 import './App.css';
 
 const VIEW_TABS: { id: ViewTab; label: string; shortcut: string }[] = [
@@ -18,6 +18,16 @@ const VIEW_TABS: { id: ViewTab; label: string; shortcut: string }[] = [
   { id: 'mixer', label: 'Mixer', shortcut: '3' },
   { id: 'arrangement', label: 'Arrangement', shortcut: '4' },
   { id: 'sample-browser', label: 'Samples', shortcut: '5' },
+];
+
+const AUTOMATION_TARGETS: { value: AutomationTarget; label: string }[] = [
+  { value: 'masterVolume', label: 'Master Volume' },
+  { value: 'masterFilterCutoff', label: 'Master Filter Cutoff' },
+  { value: 'masterFilterResonance', label: 'Master Filter Resonance' },
+  { value: 'masterReverbDecay', label: 'Master Reverb Decay' },
+  { value: 'masterReverbDamping', label: 'Master Reverb Damping' },
+  { value: 'masterDelayFeedback', label: 'Master Delay Feedback' },
+  { value: 'masterDelayMix', label: 'Master Delay Mix' },
 ];
 
 function App() {
@@ -493,6 +503,7 @@ function App() {
             onSetMixerTrackPan={setMixerTrackPan}
             onSetMixerTrackEQBand={setMixerTrackEQBand}
             onSetMixerTrackEQEnabled={setMixerTrackEQEnabled}
+            onSetMasterLimiter={setMasterLimiter}
           />
         </ResizablePanel>
       )}
@@ -526,6 +537,12 @@ function App() {
             onRemoveAudioClip={removeAudioClip}
             onMoveAudioClip={moveAudioClip}
             onResizeAudioClip={resizeAudioClip}
+            automationTargets={AUTOMATION_TARGETS}
+            onPlaceAutomationClip={placeAutomationClip}
+            onRemoveAutomationClip={removeAutomationClip}
+            onMoveAutomationClip={moveAutomationClip}
+            onResizeAutomationClip={resizeAutomationClip}
+            onToggleAutomationClipEnabled={toggleAutomationClipEnabled}
           />
 
           <AutomationLanes
