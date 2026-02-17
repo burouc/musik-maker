@@ -8,6 +8,7 @@ import type {
   Pattern,
   ArrangementTrack,
   ArrangementBlock,
+  AudioClip,
   PlaybackMode,
   SequencerState,
   PianoNote,
@@ -19,6 +20,7 @@ import type {
   AutomationLane,
   AutomationPoint,
   AutomationTarget,
+  AutomationClip,
   ProjectData,
   InsertEffect,
   InsertEffectType,
@@ -106,6 +108,8 @@ const DEFAULT_ARRANGEMENT_TRACKS: ArrangementTrack[] = Array.from(
     id: `arr-track-${i}`,
     name: `Track ${i + 1}`,
     blocks: [],
+    audioClips: [],
+    automationClips: [],
     muted: false,
   }),
 );
@@ -501,6 +505,30 @@ function useSequencer() {
               }
             }
 
+            // Play audio clips on the arrangement timeline
+            if (nextStep === 0) {
+              for (const arrTrack of current.arrangement) {
+                if (arrTrack.muted) continue;
+                for (const clip of arrTrack.audioClips ?? []) {
+                  if (clip.startMeasure === nextMeasure) {
+                    const sample = current.samples.find((s) => s.id === clip.sampleId);
+                    if (sample) {
+                      audioEngine.current.playSample(
+                        sample.url,
+                        `audio-clip-${clip.id}`,
+                        clip.volume,
+                        clip.pitchOffset,
+                        false,
+                        0,
+                        1,
+                        clip.gain,
+                      );
+                    }
+                  }
+                }
+              }
+            }
+
             // Metronome click on each beat (every 4 steps)
             if (current.metronomeEnabled && nextStep % 4 === 0) {
               audioEngine.current.playMetronome(nextStep === 0);
@@ -512,6 +540,23 @@ function useSequencer() {
               const val = getAutomationValue(lane.points, nextMeasure, nextStep);
               if (val !== null) {
                 applyAutomation(lane.target, val);
+              }
+            }
+
+            // Apply automation clips from arrangement tracks
+            for (const arrTrack of current.arrangement) {
+              if (arrTrack.muted) continue;
+              for (const clip of arrTrack.automationClips ?? []) {
+                if (!clip.enabled || clip.points.length === 0) continue;
+                // Check if the current position is within this clip's range
+                if (nextMeasure >= clip.startMeasure && nextMeasure < clip.startMeasure + clip.duration) {
+                  // Points are stored relative to the clip start
+                  const relMeasure = nextMeasure - clip.startMeasure;
+                  const val = getAutomationValue(clip.points, relMeasure, nextStep);
+                  if (val !== null) {
+                    applyAutomation(clip.target, val);
+                  }
+                }
               }
             }
 
@@ -1272,6 +1317,8 @@ function useSequencer() {
         id: `arr-track-${Date.now()}`,
         name: `Track ${prev.arrangement.length + 1}`,
         blocks: [],
+        audioClips: [],
+        automationClips: [],
         muted: false,
       };
       return {
@@ -1297,6 +1344,346 @@ function useSequencer() {
       arrangementLength: Math.max(4, Math.min(64, length)),
     }));
   }, []);
+
+  // -----------------------------------------------------------------------
+  // Audio clip actions (clips placed directly on the arrangement timeline)
+  // -----------------------------------------------------------------------
+
+  const AUDIO_CLIP_COLORS = [
+    '#06b6d4', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#6366f1', '#14b8a6',
+  ];
+
+  const placeAudioClip = useCallback(
+    (arrTrackId: string, measure: number, sampleId: string) => {
+      setState((prev) => {
+        const sample = prev.samples.find((s) => s.id === sampleId);
+        if (!sample) return prev;
+
+        // Calculate duration in measures from sample buffer length
+        const secondsPerMeasure = (60 / prev.bpm) * 4; // 4 beats per measure
+        const buffer = audioEngine.current.getSampleBuffer(sample.url);
+        const durationMeasures = buffer
+          ? Math.max(1, Math.ceil(buffer.duration / secondsPerMeasure))
+          : 1;
+
+        const clipId = `clip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const existingClipCount = prev.arrangement.reduce(
+          (sum, t) => sum + t.audioClips.length, 0,
+        );
+        const newClip: AudioClip = {
+          id: clipId,
+          sampleId,
+          startMeasure: measure,
+          duration: durationMeasures,
+          volume: 0.8,
+          gain: 0,
+          pitchOffset: 0,
+          color: AUDIO_CLIP_COLORS[existingClipCount % AUDIO_CLIP_COLORS.length],
+        };
+
+        return {
+          ...prev,
+          arrangement: prev.arrangement.map((arrTrack) => {
+            if (arrTrack.id !== arrTrackId) return arrTrack;
+            return {
+              ...arrTrack,
+              audioClips: [...(arrTrack.audioClips ?? []), newClip],
+            };
+          }),
+        };
+      });
+    },
+    [],
+  );
+
+  const removeAudioClip = useCallback(
+    (arrTrackId: string, clipId: string) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            audioClips: (arrTrack.audioClips ?? []).filter((c) => c.id !== clipId),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const moveAudioClip = useCallback(
+    (
+      fromTrackId: string,
+      clipId: string,
+      toTrackId: string,
+      toStartMeasure: number,
+    ) => {
+      setState((prev) => {
+        const srcTrack = prev.arrangement.find((t) => t.id === fromTrackId);
+        const clip = (srcTrack?.audioClips ?? []).find((c) => c.id === clipId);
+        if (!clip) return prev;
+
+        const movedClip: AudioClip = { ...clip, startMeasure: toStartMeasure };
+
+        return {
+          ...prev,
+          arrangement: prev.arrangement.map((arrTrack) => {
+            if (arrTrack.id === fromTrackId && arrTrack.id === toTrackId) {
+              return {
+                ...arrTrack,
+                audioClips: [
+                  ...(arrTrack.audioClips ?? []).filter((c) => c.id !== clipId),
+                  movedClip,
+                ],
+              };
+            }
+            if (arrTrack.id === fromTrackId) {
+              return {
+                ...arrTrack,
+                audioClips: (arrTrack.audioClips ?? []).filter((c) => c.id !== clipId),
+              };
+            }
+            if (arrTrack.id === toTrackId) {
+              return {
+                ...arrTrack,
+                audioClips: [...(arrTrack.audioClips ?? []), movedClip],
+              };
+            }
+            return arrTrack;
+          }),
+        };
+      });
+    },
+    [],
+  );
+
+  const resizeAudioClip = useCallback(
+    (arrTrackId: string, clipId: string, newDuration: number) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            audioClips: (arrTrack.audioClips ?? []).map((c) =>
+              c.id === clipId ? { ...c, duration: Math.max(1, newDuration) } : c,
+            ),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const setAudioClipVolume = useCallback(
+    (arrTrackId: string, clipId: string, volume: number) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            audioClips: (arrTrack.audioClips ?? []).map((c) =>
+              c.id === clipId ? { ...c, volume: Math.max(0, Math.min(1, volume)) } : c,
+            ),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  // -----------------------------------------------------------------------
+  // Automation clip actions (clips placed on the arrangement timeline)
+  // -----------------------------------------------------------------------
+
+  const AUTOMATION_CLIP_COLORS = [
+    '#4ecdc4', '#a855f7', '#f59e0b', '#3b82f6', '#ef4444', '#22c55e', '#ec4899', '#6366f1',
+  ];
+
+  const placeAutomationClip = useCallback(
+    (arrTrackId: string, measure: number, target: AutomationTarget) => {
+      setState((prev) => {
+        const clipId = `autoclip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const existingCount = prev.arrangement.reduce(
+          (sum, t) => sum + (t.automationClips ?? []).length, 0,
+        );
+
+        // Derive a display name from the target
+        const name = target.startsWith('master')
+          ? target.replace('master', 'Master ').replace(/([A-Z])/g, ' $1').trim()
+          : target.replace(/:/g, ' ').replace(/([A-Z])/g, ' $1').trim();
+
+        const newClip: AutomationClip = {
+          id: clipId,
+          target,
+          name,
+          startMeasure: measure,
+          duration: 4,
+          points: [],
+          enabled: true,
+          color: AUTOMATION_CLIP_COLORS[existingCount % AUTOMATION_CLIP_COLORS.length],
+        };
+
+        return {
+          ...prev,
+          arrangement: prev.arrangement.map((arrTrack) => {
+            if (arrTrack.id !== arrTrackId) return arrTrack;
+            return {
+              ...arrTrack,
+              automationClips: [...(arrTrack.automationClips ?? []), newClip],
+            };
+          }),
+        };
+      });
+    },
+    [],
+  );
+
+  const removeAutomationClip = useCallback(
+    (arrTrackId: string, clipId: string) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            automationClips: (arrTrack.automationClips ?? []).filter((c) => c.id !== clipId),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const moveAutomationClip = useCallback(
+    (fromTrackId: string, clipId: string, toTrackId: string, toStartMeasure: number) => {
+      setState((prev) => {
+        const srcTrack = prev.arrangement.find((t) => t.id === fromTrackId);
+        const clip = (srcTrack?.automationClips ?? []).find((c) => c.id === clipId);
+        if (!clip) return prev;
+
+        const movedClip: AutomationClip = { ...clip, startMeasure: toStartMeasure };
+
+        return {
+          ...prev,
+          arrangement: prev.arrangement.map((arrTrack) => {
+            if (arrTrack.id === fromTrackId && arrTrack.id === toTrackId) {
+              return {
+                ...arrTrack,
+                automationClips: [
+                  ...(arrTrack.automationClips ?? []).filter((c) => c.id !== clipId),
+                  movedClip,
+                ],
+              };
+            }
+            if (arrTrack.id === fromTrackId) {
+              return {
+                ...arrTrack,
+                automationClips: (arrTrack.automationClips ?? []).filter((c) => c.id !== clipId),
+              };
+            }
+            if (arrTrack.id === toTrackId) {
+              return {
+                ...arrTrack,
+                automationClips: [...(arrTrack.automationClips ?? []), movedClip],
+              };
+            }
+            return arrTrack;
+          }),
+        };
+      });
+    },
+    [],
+  );
+
+  const resizeAutomationClip = useCallback(
+    (arrTrackId: string, clipId: string, newDuration: number) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            automationClips: (arrTrack.automationClips ?? []).map((c) =>
+              c.id === clipId ? { ...c, duration: Math.max(1, newDuration) } : c,
+            ),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const setAutomationClipPoint = useCallback(
+    (arrTrackId: string, clipId: string, measure: number, step: number, value: number) => {
+      const clamped = Math.max(0, Math.min(1, value));
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            automationClips: (arrTrack.automationClips ?? []).map((clip) => {
+              if (clip.id !== clipId) return clip;
+              const filtered = clip.points.filter(
+                (p) => !(p.measure === measure && p.step === step),
+              );
+              const newPoint: AutomationPoint = { measure, step, value: clamped };
+              const points = [...filtered, newPoint].sort(
+                (a, b) => a.measure - b.measure || a.step - b.step,
+              );
+              return { ...clip, points };
+            }),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const removeAutomationClipPoint = useCallback(
+    (arrTrackId: string, clipId: string, measure: number, step: number) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            automationClips: (arrTrack.automationClips ?? []).map((clip) => {
+              if (clip.id !== clipId) return clip;
+              return {
+                ...clip,
+                points: clip.points.filter(
+                  (p) => !(p.measure === measure && p.step === step),
+                ),
+              };
+            }),
+          };
+        }),
+      }));
+    },
+    [],
+  );
+
+  const toggleAutomationClipEnabled = useCallback(
+    (arrTrackId: string, clipId: string) => {
+      setState((prev) => ({
+        ...prev,
+        arrangement: prev.arrangement.map((arrTrack) => {
+          if (arrTrack.id !== arrTrackId) return arrTrack;
+          return {
+            ...arrTrack,
+            automationClips: (arrTrack.automationClips ?? []).map((c) =>
+              c.id === clipId ? { ...c, enabled: !c.enabled } : c,
+            ),
+          };
+        }),
+      }));
+    },
+    [],
+  );
 
   const setLoopStart = useCallback((measure: number | null) => {
     setState((prev) => ({
@@ -1500,6 +1887,11 @@ function useSequencer() {
           sampleTracks: pattern.sampleTracks.map((t) =>
             t.sampleId === sampleId ? { ...t, sampleId: null } : t,
           ),
+        })),
+        // Remove any audio clips referencing this sample
+        arrangement: prev.arrangement.map((arrTrack) => ({
+          ...arrTrack,
+          audioClips: (arrTrack.audioClips ?? []).filter((c) => c.sampleId !== sampleId),
         })),
       };
     });
@@ -2562,7 +2954,11 @@ function useSequencer() {
         })),
       })),
       activePatternId: project.activePatternId,
-      arrangement: project.arrangement,
+      arrangement: project.arrangement.map((t) => ({
+        ...t,
+        audioClips: t.audioClips ?? [],
+        automationClips: t.automationClips ?? [],
+      })),
       arrangementLength: project.arrangementLength,
       automationLanes: project.automationLanes,
       loopStart: project.loopStart,
@@ -2725,6 +3121,11 @@ function useSequencer() {
     addArrangementTrack,
     removeArrangementTrack,
     setArrangementLength,
+    placeAudioClip,
+    removeAudioClip,
+    moveAudioClip,
+    resizeAudioClip,
+    setAudioClipVolume,
     setPlaybackMode,
     setLoopStart,
     setLoopEnd,
@@ -2791,7 +3192,15 @@ function useSequencer() {
     setChannelMixerRouting,
     setMixerTrackEQBand,
     setMixerTrackEQEnabled,
-    // Automation
+    // Automation clips
+    placeAutomationClip,
+    removeAutomationClip,
+    moveAutomationClip,
+    resizeAutomationClip,
+    setAutomationClipPoint,
+    removeAutomationClipPoint,
+    toggleAutomationClipEnabled,
+    // Automation lanes
     addAutomationLane,
     removeAutomationLane,
     toggleAutomationLane,

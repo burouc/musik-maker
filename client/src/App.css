@@ -2285,6 +2285,32 @@
   cursor: grabbing;
 }
 
+/* Audio clip styling */
+.arrangement-audio-clip {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--block-color) 85%, #fff 15%) 0%,
+    var(--block-color) 40%,
+    color-mix(in srgb, var(--block-color) 80%, #000 20%) 100%
+  ) !important;
+  border-left: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.arrangement-clip-icon {
+  font-size: 0.55rem;
+  margin-right: 2px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.sample-browser-item[draggable='true'] {
+  cursor: grab;
+}
+
+.sample-browser-item[draggable='true']:active {
+  cursor: grabbing;
+}
+
 /* Loop marker bar */
 .arrangement-loop-bar {
   margin-bottom: 2px;

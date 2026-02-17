@@ -54,10 +54,54 @@ export interface ArrangementBlock {
   duration: number;
 }
 
+/** An audio clip placed directly on the arrangement timeline */
+export interface AudioClip {
+  /** Unique identifier */
+  id: string;
+  /** Reference to a loaded SampleInstrument */
+  sampleId: string;
+  /** Measure index (0-based) where this clip starts */
+  startMeasure: number;
+  /** Duration in measures (auto-calculated from sample length, or user-resized) */
+  duration: number;
+  /** Volume: 0–1 */
+  volume: number;
+  /** Gain adjustment in dB (−24 to +24) */
+  gain: number;
+  /** Pitch offset in semitones (−24 to +24) */
+  pitchOffset: number;
+  /** Display color */
+  color: string;
+}
+
+/** An automation clip placed on the arrangement timeline */
+export interface AutomationClip {
+  /** Unique identifier */
+  id: string;
+  /** Which parameter this clip automates */
+  target: AutomationTarget;
+  /** Display name */
+  name: string;
+  /** Measure index (0-based) where this clip starts */
+  startMeasure: number;
+  /** Duration in measures */
+  duration: number;
+  /** Breakpoints relative to the clip start, sorted by (measure, step) */
+  points: AutomationPoint[];
+  /** Whether this clip is actively applied during playback */
+  enabled: boolean;
+  /** Display color */
+  color: string;
+}
+
 export interface ArrangementTrack {
   id: string;
   name: string;
   blocks: ArrangementBlock[];
+  /** Audio clips placed directly on the timeline */
+  audioClips: AudioClip[];
+  /** Automation clips placed on the timeline */
+  automationClips: AutomationClip[];
   muted: boolean;
 }
 

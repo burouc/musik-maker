@@ -310,7 +310,15 @@ const SampleBrowser = React.memo<SampleBrowserProps>(function SampleBrowser({
             </div>
           )}
           {displaySamples.map((sample) => (
-            <div key={sample.id} className="sample-browser-item">
+            <div
+              key={sample.id}
+              className="sample-browser-item"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/x-sample-id', sample.id);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+            >
               <button
                 className={`sample-browser-preview-btn${previewingSampleId === sample.id ? ' playing' : ''}`}
                 onClick={() => handlePreview(sample)}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import useSequencer from './hooks/useSequencer';
 import StepSequencer from './components/StepSequencer';
 import TransportControls from './components/TransportControls';
@@ -9,7 +9,7 @@ import Arrangement from './components/Arrangement';
 import AutomationLanes from './components/AutomationLanes';
 import SampleBrowser from './components/SampleBrowser';
 import ResizablePanel from './components/ResizablePanel';
-import type { ViewTab } from './types';
+import type { ViewTab, AutomationTarget, ChannelAutomationParam } from './types';
 import './App.css';
 
 const VIEW_TABS: { id: ViewTab; label: string; shortcut: string }[] = [
@@ -61,6 +61,10 @@ function App() {
     addArrangementTrack,
     removeArrangementTrack,
     setArrangementLength,
+    placeAudioClip,
+    removeAudioClip,
+    moveAudioClip,
+    resizeAudioClip,
     setPlaybackMode,
     setLoopStart,
     setLoopEnd,
@@ -126,7 +130,13 @@ function App() {
     setMixerTrackPan,
     setMixerTrackEQBand,
     setMixerTrackEQEnabled,
-    // Automation
+    // Automation clips
+    placeAutomationClip,
+    removeAutomationClip,
+    moveAutomationClip,
+    resizeAutomationClip,
+    toggleAutomationClipEnabled,
+    // Automation lanes
     addAutomationLane,
     removeAutomationLane,
     toggleAutomationLane,
@@ -499,6 +509,7 @@ function App() {
             isPlaying={state.isPlaying}
             loopStart={state.loopStart}
             loopEnd={state.loopEnd}
+            samples={state.samples}
             onToggleBlock={toggleArrangementBlock}
             onPlaceBlock={placeArrangementBlock}
             onResizeBlock={resizeArrangementBlock}
@@ -511,6 +522,10 @@ function App() {
             onSetLoopStart={setLoopStart}
             onSetLoopEnd={setLoopEnd}
             onClearLoop={clearLoopMarkers}
+            onPlaceAudioClip={placeAudioClip}
+            onRemoveAudioClip={removeAudioClip}
+            onMoveAudioClip={moveAudioClip}
+            onResizeAudioClip={resizeAudioClip}
           />
 
           <AutomationLanes

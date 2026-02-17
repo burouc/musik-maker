@@ -1494,6 +1494,11 @@ class AudioEngine {
     return this.sampleBuffers.has(url);
   }
 
+  /** Get the AudioBuffer for a loaded sample (used to calculate duration). */
+  getSampleBuffer(url: string): AudioBuffer | undefined {
+    return this.sampleBuffers.get(url);
+  }
+
   /** Ensure a sample track channel exists (gain, panner, analyser, send gains). */
   ensureSampleChannel(trackId: string): void {
     if (this.samplePanners.has(trackId)) return;
