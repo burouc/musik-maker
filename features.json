@@ -196,7 +196,7 @@
           "id": "mx-06",
           "priority": "P1",
           "title": "Mixer track routing (any channel to any mixer track)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "mx-07",
