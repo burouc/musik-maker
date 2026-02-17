@@ -477,6 +477,14 @@ export interface SampleTrack {
   sends: Record<string, number>;
   /** ID of the mixer track this channel routes to (null = direct to master) */
   mixerTrackId: string | null;
+  /** Trim start position as a fraction of total sample duration (0–1, default 0) */
+  trimStart: number;
+  /** Trim end position as a fraction of total sample duration (0–1, default 1) */
+  trimEnd: number;
+  /** Gain adjustment in dB (−24 to +24, default 0) */
+  gain: number;
+  /** Base pitch offset in semitones (−24 to +24, default 0) — tunes the whole sample to match a note */
+  basePitch: number;
 }
 
 /** Per-channel automation target format: `${channelType}:${channelId}:${param}` */

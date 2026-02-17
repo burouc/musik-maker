@@ -94,6 +94,10 @@ function App() {
     setSampleTrackReverbSend,
     setSampleTrackDelaySend,
     setSampleTrackFilterSend,
+    setSampleTrackTrimStart,
+    setSampleTrackTrimEnd,
+    setSampleTrackGain,
+    setSampleTrackBasePitch,
     // Insert effects
     addInsertEffect,
     removeInsertEffect,
@@ -381,6 +385,10 @@ function App() {
             onStopPreview={stopPreview}
             onAddSampleTrack={addSampleTrack}
             onRemoveSampleTrack={removeSampleTrack}
+            onSetSampleTrackTrimStart={setSampleTrackTrimStart}
+            onSetSampleTrackTrimEnd={setSampleTrackTrimEnd}
+            onSetSampleTrackGain={setSampleTrackGain}
+            onSetSampleTrackBasePitch={setSampleTrackBasePitch}
           />
         </ResizablePanel>
       )}

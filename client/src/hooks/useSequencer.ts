@@ -380,8 +380,8 @@ function useSequencer() {
               if (!effectivelyMuted && sTrack.sampleId) {
                 const sample = current.samples.find((s) => s.id === sTrack.sampleId);
                 if (sample) {
-                  const pitchOffset = sTrack.pitches?.[nextStep] ?? 0;
-                  audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * stepVelocity, pitchOffset, sTrack.playbackMode === 'loop');
+                  const pitchOffset = (sTrack.basePitch ?? 0) + (sTrack.pitches?.[nextStep] ?? 0);
+                  audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * stepVelocity, pitchOffset, sTrack.playbackMode === 'loop', sTrack.trimStart ?? 0, sTrack.trimEnd ?? 1, sTrack.gain ?? 0);
                 }
               }
             }
@@ -478,8 +478,8 @@ function useSequencer() {
                     if (!sEffectivelyMuted && sTrack.sampleId) {
                       const sample = current.samples.find((s) => s.id === sTrack.sampleId);
                       if (sample) {
-                        const sPitchOffset = sTrack.pitches?.[nextStep] ?? 0;
-                        audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * sVelocity, sPitchOffset, sTrack.playbackMode === 'loop');
+                        const sPitchOffset = (sTrack.basePitch ?? 0) + (sTrack.pitches?.[nextStep] ?? 0);
+                        audioEngine.current.playSample(sample.url, sTrack.id, sTrack.volume * sVelocity, sPitchOffset, sTrack.playbackMode === 'loop', sTrack.trimStart ?? 0, sTrack.trimEnd ?? 1, sTrack.gain ?? 0);
                       }
                     }
                   }
@@ -1528,6 +1528,10 @@ function useSequencer() {
         insertEffects: [],
         sends: {},
         mixerTrackId: null,
+        trimStart: 0,
+        trimEnd: 1,
+        gain: 0,
+        basePitch: 0,
       };
       return {
         ...prev,
@@ -1798,6 +1802,74 @@ function useSequencer() {
               ...pattern,
               sampleTracks: pattern.sampleTracks.map((track) =>
                 track.id === trackId ? { ...track, filterSend: clamped } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackTrimStart = useCallback((trackId: string, value: number) => {
+    const clamped = Math.max(0, Math.min(1, value));
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, trimStart: Math.min(clamped, (track.trimEnd ?? 1) - 0.01) } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackTrimEnd = useCallback((trackId: string, value: number) => {
+    const clamped = Math.max(0, Math.min(1, value));
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, trimEnd: Math.max(clamped, (track.trimStart ?? 0) + 0.01) } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackGain = useCallback((trackId: string, value: number) => {
+    const clamped = Math.max(-24, Math.min(24, value));
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, gain: clamped } : track,
+              ),
+            }
+          : pattern,
+      ),
+    }));
+  }, []);
+
+  const setSampleTrackBasePitch = useCallback((trackId: string, value: number) => {
+    const clamped = Math.round(Math.max(-24, Math.min(24, value)));
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((pattern) =>
+        pattern.id === prev.activePatternId
+          ? {
+              ...pattern,
+              sampleTracks: pattern.sampleTracks.map((track) =>
+                track.id === trackId ? { ...track, basePitch: clamped } : track,
               ),
             }
           : pattern,
@@ -2439,7 +2511,16 @@ function useSequencer() {
       masterReverb: project.masterReverb,
       masterDelay: project.masterDelay,
       masterFilter: project.masterFilter,
-      patterns: project.patterns,
+      patterns: project.patterns.map((p) => ({
+        ...p,
+        sampleTracks: p.sampleTracks.map((t) => ({
+          ...t,
+          trimStart: t.trimStart ?? 0,
+          trimEnd: t.trimEnd ?? 1,
+          gain: t.gain ?? 0,
+          basePitch: t.basePitch ?? 0,
+        })),
+      })),
       activePatternId: project.activePatternId,
       arrangement: project.arrangement,
       arrangementLength: project.arrangementLength,
@@ -2639,6 +2720,10 @@ function useSequencer() {
     setSampleTrackReverbSend,
     setSampleTrackDelaySend,
     setSampleTrackFilterSend,
+    setSampleTrackTrimStart,
+    setSampleTrackTrimEnd,
+    setSampleTrackGain,
+    setSampleTrackBasePitch,
     // Insert effects
     addInsertEffect,
     removeInsertEffect,

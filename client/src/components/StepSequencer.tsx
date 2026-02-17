@@ -165,6 +165,10 @@ interface SampleStepRowProps {
   onPreviewSample: (file: File) => Promise<void>;
   onStopPreview: () => void;
   onRemoveTrack: (trackId: string) => void;
+  onSetTrimStart: (trackId: string, value: number) => void;
+  onSetTrimEnd: (trackId: string, value: number) => void;
+  onSetGain: (trackId: string, value: number) => void;
+  onSetBasePitch: (trackId: string, value: number) => void;
 }
 
 const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
@@ -181,6 +185,10 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
   onPreviewSample,
   onStopPreview,
   onRemoveTrack,
+  onSetTrimStart,
+  onSetTrimEnd,
+  onSetGain,
+  onSetBasePitch,
 }) {
   const dragRef = useRef<{
     trackId: string;
@@ -194,6 +202,7 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, stepIndex: number) => {
@@ -304,6 +313,13 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
             {track.playbackMode === 'loop' ? '⟳' : '▶'}
           </button>
           <button
+            className={`sample-edit-btn${showEdit ? ' active' : ''}`}
+            onClick={() => setShowEdit((v) => !v)}
+            title="Edit sample (trim & gain)"
+          >
+            &#9998;
+          </button>
+          <button
             className="sample-load-btn"
             onClick={() => fileInputRef.current?.click()}
             title="Load audio file"
@@ -405,6 +421,58 @@ const SampleStepRow = React.memo<SampleStepRowProps>(function SampleStepRow({
           );
         })}
       </div>
+      {showEdit && track.sampleId && (
+        <div className="sample-edit-panel">
+          <label className="sample-edit-field" title="Trim start (fraction of sample)">
+            <span className="sample-edit-label">Start</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.001}
+              value={track.trimStart ?? 0}
+              onChange={(e) => onSetTrimStart(track.id, Number(e.target.value))}
+            />
+            <span className="sample-edit-value">{((track.trimStart ?? 0) * 100).toFixed(1)}%</span>
+          </label>
+          <label className="sample-edit-field" title="Trim end (fraction of sample)">
+            <span className="sample-edit-label">End</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.001}
+              value={track.trimEnd ?? 1}
+              onChange={(e) => onSetTrimEnd(track.id, Number(e.target.value))}
+            />
+            <span className="sample-edit-value">{((track.trimEnd ?? 1) * 100).toFixed(1)}%</span>
+          </label>
+          <label className="sample-edit-field" title="Gain adjustment in dB">
+            <span className="sample-edit-label">Gain</span>
+            <input
+              type="range"
+              min={-24}
+              max={24}
+              step={0.1}
+              value={track.gain ?? 0}
+              onChange={(e) => onSetGain(track.id, Number(e.target.value))}
+            />
+            <span className="sample-edit-value">{(track.gain ?? 0).toFixed(1)} dB</span>
+          </label>
+          <label className="sample-edit-field" title="Base pitch offset in semitones (tunes the sample to match a note)">
+            <span className="sample-edit-label">Pitch</span>
+            <input
+              type="range"
+              min={-24}
+              max={24}
+              step={1}
+              value={track.basePitch ?? 0}
+              onChange={(e) => onSetBasePitch(track.id, Number(e.target.value))}
+            />
+            <span className="sample-edit-value">{(track.basePitch ?? 0) > 0 ? '+' : ''}{track.basePitch ?? 0} st</span>
+          </label>
+        </div>
+      )}
     </div>
   );
 });
@@ -430,6 +498,10 @@ interface StepSequencerProps {
   onStopPreview: () => void;
   onAddSampleTrack: () => void;
   onRemoveSampleTrack: (trackId: string) => void;
+  onSetSampleTrackTrimStart: (trackId: string, value: number) => void;
+  onSetSampleTrackTrimEnd: (trackId: string, value: number) => void;
+  onSetSampleTrackGain: (trackId: string, value: number) => void;
+  onSetSampleTrackBasePitch: (trackId: string, value: number) => void;
 }
 
 const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
@@ -453,6 +525,10 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
   onStopPreview,
   onAddSampleTrack,
   onRemoveSampleTrack,
+  onSetSampleTrackTrimStart,
+  onSetSampleTrackTrimEnd,
+  onSetSampleTrackGain,
+  onSetSampleTrackBasePitch,
 }) {
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
 
@@ -535,6 +611,10 @@ const StepSequencer = React.memo<StepSequencerProps>(function StepSequencer({
           onPreviewSample={onPreviewSample}
           onStopPreview={onStopPreview}
           onRemoveTrack={onRemoveSampleTrack}
+          onSetTrimStart={onSetSampleTrackTrimStart}
+          onSetTrimEnd={onSetSampleTrackTrimEnd}
+          onSetGain={onSetSampleTrackGain}
+          onSetBasePitch={onSetSampleTrackBasePitch}
         />
       ))}
       <button className="add-sample-track-btn" onClick={onAddSampleTrack}>

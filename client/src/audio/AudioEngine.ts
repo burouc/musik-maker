@@ -1551,7 +1551,7 @@ class AudioEngine {
   }
 
   /** Play a loaded sample on a sample track channel. */
-  async playSample(sampleUrl: string, trackId: string, volume: number, pitchOffset: number = 0, loop: boolean = false): Promise<void> {
+  async playSample(sampleUrl: string, trackId: string, volume: number, pitchOffset: number = 0, loop: boolean = false, trimStart: number = 0, trimEnd: number = 1, gainDb: number = 0): Promise<void> {
     await this.resume();
     const buffer = this.sampleBuffers.get(sampleUrl);
     if (!buffer) return;
@@ -1567,12 +1567,23 @@ class AudioEngine {
     source.playbackRate.value = this.pitchRatio(pitchOffset);
     source.loop = loop;
 
+    // Apply trim: calculate offset and duration in seconds
+    const startOffset = trimStart * buffer.duration;
+    const trimDuration = (trimEnd - trimStart) * buffer.duration;
+
+    if (loop) {
+      source.loopStart = startOffset;
+      source.loopEnd = trimEnd * buffer.duration;
+    }
+
+    // Convert dB gain to linear and combine with velocity volume
+    const linearGain = Math.pow(10, gainDb / 20);
     const gain = this.context.createGain();
-    gain.gain.value = volume;
+    gain.gain.value = volume * linearGain;
 
     source.connect(gain);
     gain.connect(output);
-    source.start();
+    source.start(0, startOffset, loop ? undefined : trimDuration);
 
     // Track active source so it can be stopped later
     this.activeSampleSources.set(trackId, { source, gain });
