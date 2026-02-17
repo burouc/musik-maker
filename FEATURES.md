@@ -73,7 +73,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [ ] **[P0]** Delay (tempo-synced, with feedback and mix controls)
 - [ ] **[P0]** Filter (low-pass, high-pass, band-pass with resonance)
 - [ ] **[P1]** Compressor (threshold, ratio, attack, release, gain)
-- [ ] **[P1]** Distortion / overdrive / saturation
+- [x] **[P1]** Distortion / overdrive / saturation
 - [ ] **[P1]** Chorus / flanger / phaser
 - [ ] **[P1]** Limiter on master bus
 - [ ] **[P2]** Bitcrusher
