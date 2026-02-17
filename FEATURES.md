@@ -75,7 +75,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [ ] **[P1]** Compressor (threshold, ratio, attack, release, gain)
 - [x] **[P1]** Distortion / overdrive / saturation
 - [x] **[P1]** Chorus / flanger / phaser
-- [ ] **[P1]** Limiter on master bus
+- [x] **[P1]** Limiter on master bus
 - [ ] **[P2]** Bitcrusher
 - [ ] **[P2]** Stereo widener / imager
 - [ ] **[P2]** Graphic EQ (31-band)
