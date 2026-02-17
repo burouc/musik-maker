@@ -47,7 +47,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [x] **[P1]** Velocity lane below the piano roll grid
 - [ ] **[P1]** Snap-to-grid with configurable grid resolution (1/4, 1/8, 1/16, 1/32, triplets)
 - [ ] **[P1]** Zoom in/out (horizontal and vertical)
-- [ ] **[P1]** Scroll/pan with middle-click or scroll wheel
+- [x] **[P1]** Scroll/pan with middle-click or scroll wheel
 - [ ] **[P1]** Piano roll tools: draw, select, slice, paint, erase
 - [ ] **[P2]** Note color coding by velocity or channel
 - [ ] **[P2]** Chord stamp tool (major, minor, 7th, etc.)
