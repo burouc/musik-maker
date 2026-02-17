@@ -202,7 +202,7 @@
           "id": "mx-07",
           "priority": "P1",
           "title": "EQ per mixer track (at minimum a 3-band parametric EQ)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "mx-08",
