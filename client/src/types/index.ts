@@ -214,9 +214,18 @@ export interface DelayEffectParams {
   mix: number;
 }
 
+/** Distortion algorithm / character */
+export type DistortionMode = 'distortion' | 'overdrive' | 'saturation';
+
 export interface DistortionEffectParams {
+  /** Distortion algorithm */
+  mode: DistortionMode;
   /** Drive amount: 0–100 */
   drive: number;
+  /** Tone control (post-distortion LP filter): 200–20000 Hz */
+  tone: number;
+  /** Wet/dry mix: 0–1 */
+  mix: number;
   /** Output gain: 0–1 */
   outputGain: number;
 }
@@ -268,7 +277,7 @@ export const DEFAULT_EFFECT_PARAMS: Record<InsertEffectType, InsertEffectParams>
   filter: { type: 'lowpass', cutoff: 8000, resonance: 1 } as FilterEffectParams,
   reverb: { decay: 2, preDelay: 0.01, damping: 0.3, mix: 0.5 } as ReverbEffectParams,
   delay: { time: 0.25, feedback: 0.3, mix: 0.3 } as DelayEffectParams,
-  distortion: { drive: 20, outputGain: 0.7 } as DistortionEffectParams,
+  distortion: { mode: 'distortion', drive: 20, tone: 8000, mix: 1, outputGain: 0.7 } as DistortionEffectParams,
   chorus: { rate: 1.5, depth: 0.5, mix: 0.5 } as ChorusEffectParams,
   compressor: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, gain: 0 } as CompressorEffectParams,
 };

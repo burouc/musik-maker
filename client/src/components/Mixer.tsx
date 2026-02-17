@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, CompressorEffectParams, SendChannel, MixerTrack as MixerTrackType, EQBand, EQBandType } from '../types';
+import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, DistortionMode, ChorusEffectParams, CompressorEffectParams, SendChannel, MixerTrack as MixerTrackType, EQBand, EQBandType } from '../types';
 import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS, MAX_MIXER_TRACKS } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
@@ -213,10 +213,33 @@ const InsertEffectEditor: React.FC<{
         return (
           <>
             <div className="insert-fx-param">
+              <label>Mode</label>
+              <select
+                value={p.mode || 'distortion'}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { mode: e.target.value as DistortionMode })}
+              >
+                <option value="distortion">Distortion</option>
+                <option value="overdrive">Overdrive</option>
+                <option value="saturation">Saturation</option>
+              </select>
+            </div>
+            <div className="insert-fx-param">
               <label>Drive</label>
               <input type="range" min={1} max={100} step={1} value={p.drive}
                 onChange={(e) => onUpdateParams(channelId, effect.id, { drive: parseFloat(e.target.value) })} />
               <span>{Math.round(p.drive)}</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Tone</label>
+              <input type="range" min={200} max={20000} step={1} value={p.tone ?? 8000}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { tone: parseFloat(e.target.value) })} />
+              <span>{(p.tone ?? 8000) >= 1000 ? `${((p.tone ?? 8000) / 1000).toFixed(1)}k` : Math.round(p.tone ?? 8000)}Hz</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Mix</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.mix ?? 1}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { mix: parseFloat(e.target.value) })} />
+              <span>{Math.round((p.mix ?? 1) * 100)}%</span>
             </div>
             <div className="insert-fx-param">
               <label>Out</label>

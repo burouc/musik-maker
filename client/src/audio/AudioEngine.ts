@@ -716,23 +716,72 @@ class AudioEngine {
   }
 
   private createDistortionEffect(params: DistortionEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const inputSplitter = this.context.createGain();
+    inputSplitter.gain.value = 1;
+
     const waveshaper = this.context.createWaveShaper();
     waveshaper.oversample = '4x';
     const drive = Math.max(1, Math.min(100, params.drive));
     const samples = 44100;
     const curve = new Float32Array(samples);
+    const mode = params.mode || 'distortion';
     for (let i = 0; i < samples; i++) {
       const x = (i * 2) / samples - 1;
-      curve[i] = ((Math.PI + drive) * x) / (Math.PI + drive * Math.abs(x));
+      switch (mode) {
+        case 'overdrive': {
+          // Soft-clip with asymmetric response for tube-like warmth
+          const k = drive * 0.5;
+          curve[i] = Math.tanh(k * x);
+          break;
+        }
+        case 'saturation': {
+          // Gentle tape-style saturation using soft sigmoid
+          const amount = 1 + drive * 0.3;
+          curve[i] = x / (1 + Math.abs(x) * amount) * (1 + amount * 0.2);
+          break;
+        }
+        default: {
+          // Hard distortion — original algorithm
+          curve[i] = ((Math.PI + drive) * x) / (Math.PI + drive * Math.abs(x));
+          break;
+        }
+      }
     }
     waveshaper.curve = curve;
+
+    // Post-distortion tone filter (low-pass)
+    const toneFilter = this.context.createBiquadFilter();
+    toneFilter.type = 'lowpass';
+    toneFilter.frequency.value = Math.max(200, Math.min(20000, params.tone ?? 8000));
+    toneFilter.Q.value = 0.707;
+
+    const wetGain = this.context.createGain();
+    const mix = Math.max(0, Math.min(1, params.mix ?? 1));
+    wetGain.gain.value = mix;
+
+    const dryGain = this.context.createGain();
+    dryGain.gain.value = 1 - mix;
 
     const outputGain = this.context.createGain();
     outputGain.gain.value = Math.max(0, Math.min(1, params.outputGain));
 
-    waveshaper.connect(outputGain);
+    const outputMerge = this.context.createGain();
+    outputMerge.gain.value = 1;
 
-    return { nodes: [waveshaper, outputGain], inputNode: waveshaper, outputNode: outputGain };
+    // Wet path: input → waveshaper → tone → wetGain → merge
+    inputSplitter.connect(waveshaper);
+    waveshaper.connect(toneFilter);
+    toneFilter.connect(wetGain);
+    wetGain.connect(outputMerge);
+
+    // Dry path: input → dryGain → merge
+    inputSplitter.connect(dryGain);
+    dryGain.connect(outputMerge);
+
+    // Final output gain
+    outputMerge.connect(outputGain);
+
+    return { nodes: [inputSplitter, waveshaper, toneFilter, wetGain, dryGain, outputMerge, outputGain], inputNode: inputSplitter, outputNode: outputGain };
   }
 
   private createChorusEffect(params: ChorusEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
