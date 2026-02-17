@@ -1845,8 +1845,55 @@
   border-color: var(--accent);
 }
 
+/* Piano roll zoom controls */
+.pr-zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pr-zoom-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pr-zoom-buttons {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.pr-zoom-btn {
+  padding: 3px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pr-zoom-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pr-zoom-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .piano-roll-body {
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* Step number header */
@@ -1873,7 +1920,7 @@
   font-size: 0.6rem;
   font-family: var(--font-mono);
   color: var(--text-secondary);
-  min-width: 20px;
+  min-width: var(--pr-cell-min-width, 20px);
 }
 
 .piano-roll-step-num.beat-start {
@@ -1912,7 +1959,7 @@
 .piano-roll-row {
   display: flex;
   align-items: stretch;
-  height: 18px;
+  height: var(--pr-row-height, 18px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -1981,7 +2028,7 @@
 
 .piano-roll-cell {
   flex: 1;
-  min-width: 20px;
+  min-width: var(--pr-cell-min-width, 20px);
   border-radius: 2px;
   background: var(--step-off);
   border: 1px solid transparent;
@@ -2200,7 +2247,7 @@
 
 .velocity-lane-step {
   flex: 1;
-  min-width: 20px;
+  min-width: var(--pr-cell-min-width, 20px);
   height: 100%;
   display: flex;
   align-items: flex-end;
@@ -2533,7 +2580,7 @@
   }
 
   .piano-roll-cell {
-    min-width: 16px;
+    min-width: var(--pr-cell-min-width, 16px);
   }
 
   .piano-roll-scroll {

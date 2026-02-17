@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState, useEffect } from 'react';
+import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import type { PianoRollData, PianoNote, SynthSettings, OscillatorType, SnapResolution } from '../types';
 
 /** Note names in chromatic order */
@@ -27,6 +27,26 @@ for (let m = MIDI_HIGH; m >= MIDI_LOW; m--) {
 
 /** Pixel threshold from cell edge to trigger resize */
 const RESIZE_EDGE_PX = 6;
+
+/** Horizontal zoom presets: label and corresponding min-width for cells (px) */
+const H_ZOOM_LEVELS = [
+  { label: 'XS', minWidth: 12 },
+  { label: 'S', minWidth: 16 },
+  { label: 'M', minWidth: 20 },
+  { label: 'L', minWidth: 30 },
+  { label: 'XL', minWidth: 44 },
+] as const;
+const DEFAULT_H_ZOOM = 2; // 'M' — matches existing 20px
+
+/** Vertical zoom presets: label and corresponding row height (px) */
+const V_ZOOM_LEVELS = [
+  { label: 'XS', height: 12 },
+  { label: 'S', height: 15 },
+  { label: 'M', height: 18 },
+  { label: 'L', height: 24 },
+  { label: 'XL', height: 32 },
+] as const;
+const DEFAULT_V_ZOOM = 2; // 'M' — matches existing 18px
 
 /** Available snap resolutions with display labels */
 const SNAP_OPTIONS: { value: SnapResolution; label: string }[] = [
@@ -173,6 +193,17 @@ function PianoRoll({
   /** Snap-to-grid resolution */
   const [snapResolution, setSnapResolution] = useState<SnapResolution>('1/16');
   const [snapEnabled, setSnapEnabled] = useState(true);
+  const [hZoom, setHZoom] = useState(DEFAULT_H_ZOOM);
+  const [vZoom, setVZoom] = useState(DEFAULT_V_ZOOM);
+
+  const zoomStyle = useMemo(
+    () =>
+      ({
+        '--pr-cell-min-width': `${H_ZOOM_LEVELS[hZoom].minWidth}px`,
+        '--pr-row-height': `${V_ZOOM_LEVELS[vZoom].height}px`,
+      }) as React.CSSProperties,
+    [hZoom, vZoom],
+  );
 
   // Build a lookup: for each pitch, a sorted list of notes
   const notesByPitch = useRef<Map<number, PianoNote[]>>(new Map());
@@ -734,10 +765,38 @@ function PianoRoll({
   }, []);
 
   return (
-    <div className="piano-roll">
+    <div className="piano-roll" style={zoomStyle}>
       <div className="piano-roll-header">
         <div className="piano-roll-title-row">
           <div className="piano-roll-title">Piano Roll</div>
+          <div className="pr-zoom-control">
+            <span className="pr-zoom-label">H:</span>
+            <div className="pr-zoom-buttons">
+              {H_ZOOM_LEVELS.map((level, i) => (
+                <button
+                  key={level.label}
+                  className={`pr-zoom-btn${i === hZoom ? ' active' : ''}`}
+                  onClick={() => setHZoom(i)}
+                  title={`Horizontal zoom ${level.label}`}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+            <span className="pr-zoom-label">V:</span>
+            <div className="pr-zoom-buttons">
+              {V_ZOOM_LEVELS.map((level, i) => (
+                <button
+                  key={level.label}
+                  className={`pr-zoom-btn${i === vZoom ? ' active' : ''}`}
+                  onClick={() => setVZoom(i)}
+                  title={`Vertical zoom ${level.label}`}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="snap-controls">
             <button
               className={`snap-toggle${snapEnabled ? ' active' : ''}`}
