@@ -7,6 +7,7 @@ import PatternSelector from './components/PatternSelector';
 import PianoRoll from './components/PianoRoll';
 import Arrangement from './components/Arrangement';
 import AutomationLanes from './components/AutomationLanes';
+import SampleBrowser from './components/SampleBrowser';
 import ResizablePanel from './components/ResizablePanel';
 import type { ViewTab } from './types';
 import './App.css';
@@ -16,6 +17,7 @@ const VIEW_TABS: { id: ViewTab; label: string; shortcut: string }[] = [
   { id: 'piano-roll', label: 'Piano Roll', shortcut: '2' },
   { id: 'mixer', label: 'Mixer', shortcut: '3' },
   { id: 'arrangement', label: 'Arrangement', shortcut: '4' },
+  { id: 'sample-browser', label: 'Samples', shortcut: '5' },
 ];
 
 function App() {
@@ -80,6 +82,7 @@ function App() {
     previewSample,
     stopPreview,
     addSampleTrack,
+    addSampleTrackWithSample,
     removeSampleTrack,
     setSampleTrackSample,
     setSampleTrackPlaybackMode,
@@ -143,6 +146,11 @@ function App() {
     loadPreset,
     deletePreset: deleteServerPreset,
   } = useSequencer();
+
+  // Sample browser: assign a sample to a new sample track in the active pattern
+  const handleAssignSample = useCallback((sampleId: string) => {
+    addSampleTrackWithSample(sampleId);
+  }, [addSampleTrackWithSample]);
 
   const [activeTab, setActiveTab] = useState<ViewTab>('channel-rack');
   const [saving, setSaving] = useState(false);
@@ -520,6 +528,18 @@ function App() {
             onSetPoint={setAutomationPoint}
             onRemovePoint={removeAutomationPoint}
             onClearLane={clearAutomationLane}
+          />
+        </ResizablePanel>
+      )}
+
+      {activeTab === 'sample-browser' && (
+        <ResizablePanel defaultHeight={320} minHeight={120} maxHeight={600} className="sample-browser-panel" showDivider={false}>
+          <SampleBrowser
+            samples={state.samples}
+            onLoadSample={loadSample}
+            onPreviewSample={previewSample}
+            onStopPreview={stopPreview}
+            onAssignSample={handleAssignSample}
           />
         </ResizablePanel>
       )}

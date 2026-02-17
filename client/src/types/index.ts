@@ -557,7 +557,7 @@ export interface ProjectData {
 export type PlaybackMode = 'pattern' | 'song';
 
 /** Tabs available in the main view switcher */
-export type ViewTab = 'channel-rack' | 'piano-roll' | 'mixer' | 'arrangement';
+export type ViewTab = 'channel-rack' | 'piano-roll' | 'mixer' | 'arrangement' | 'sample-browser';
 
 export interface SequencerState {
   /** Current project ID (null if unsaved) */

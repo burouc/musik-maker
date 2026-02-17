@@ -205,7 +205,8 @@
 .resizable-panel > .mixer,
 .resizable-panel > .piano-roll,
 .resizable-panel > .arrangement,
-.resizable-panel > .automation-lanes {
+.resizable-panel > .automation-lanes,
+.resizable-panel > .sample-browser {
   height: 100%;
   margin-bottom: 0;
   overflow: auto;
@@ -1001,6 +1002,332 @@
 .sample-preview-btn.cancel:hover {
   background: #e94560;
   color: #fff;
+}
+
+.sample-edit-btn {
+  width: 18px;
+  height: 18px;
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.sample-edit-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sample-edit-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sample-edit-panel {
+  display: flex;
+  gap: 12px;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sample-edit-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.sample-edit-label {
+  min-width: 28px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sample-edit-field input[type="range"] {
+  width: 80px;
+  height: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sample-edit-value {
+  min-width: 40px;
+  text-align: right;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6rem;
+}
+
+/* =========================================================================
+   Sample Browser Panel
+   ========================================================================= */
+
+.sample-browser {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sample-browser-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.sample-browser-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+
+.sample-browser-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sample-browser-add-btn {
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.sample-browser-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sample-browser-search {
+  position: relative;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.sample-browser-search-input {
+  width: 100%;
+  padding: 5px 24px 5px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  outline: none;
+}
+
+.sample-browser-search-input:focus {
+  border-color: var(--accent);
+}
+
+.sample-browser-search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.sample-browser-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.sample-browser-search-clear:hover {
+  color: var(--accent);
+}
+
+.sample-browser-body {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sample-browser-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 110px;
+  max-width: 140px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-surface) var(--bg-primary);
+}
+
+.sample-browser-folder-item {
+  display: flex;
+}
+
+.sample-browser-folder-btn {
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sample-browser-folder-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.sample-browser-folder-btn.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.sample-browser-folder-rename {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.sample-browser-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-surface) var(--bg-primary);
+  min-width: 0;
+}
+
+.sample-browser-loading,
+.sample-browser-empty {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 16px 8px;
+}
+
+.sample-browser-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+
+.sample-browser-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sample-browser-preview-btn {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.sample-browser-preview-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sample-browser-preview-btn.playing {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sample-browser-item-name {
+  flex: 1;
+  font-size: 0.7rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.sample-browser-item-ext {
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.sample-browser-assign-btn {
+  padding: 2px 8px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.sample-browser-assign-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Sample browser panel layout in the app */
+.sample-browser-panel {
+  overflow: hidden;
 }
 
 /* =========================================================================

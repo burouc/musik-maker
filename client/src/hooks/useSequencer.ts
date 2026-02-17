@@ -1544,6 +1544,46 @@ function useSequencer() {
     });
   }, []);
 
+  const addSampleTrackWithSample = useCallback((sampleId: string) => {
+    setState((prev) => {
+      const pattern = prev.patterns.find((p) => p.id === prev.activePatternId);
+      if (!pattern) return prev;
+      const sample = prev.samples.find((s) => s.id === sampleId);
+      const trackId = `strack-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      audioEngine.current.ensureSampleChannel(trackId);
+      const newTrack: SampleTrack = {
+        id: trackId,
+        name: sample ? sample.name : `Sample ${pattern.sampleTracks.length + 1}`,
+        sampleId,
+        playbackMode: 'oneshot',
+        steps: Array(pattern.stepCount).fill(0),
+        pitches: Array(pattern.stepCount).fill(0),
+        volume: 0.8,
+        pan: 0,
+        muted: false,
+        solo: false,
+        reverbSend: 0,
+        delaySend: 0,
+        filterSend: 0,
+        insertEffects: [],
+        sends: {},
+        mixerTrackId: null,
+        trimStart: 0,
+        trimEnd: 1,
+        gain: 0,
+        basePitch: 0,
+      };
+      return {
+        ...prev,
+        patterns: prev.patterns.map((p) =>
+          p.id === prev.activePatternId
+            ? { ...p, sampleTracks: [...p.sampleTracks, newTrack] }
+            : p,
+        ),
+      };
+    });
+  }, []);
+
   const removeSampleTrack = useCallback((trackId: string) => {
     audioEngine.current.removeSampleChannel(trackId);
     setState((prev) => ({
@@ -2706,6 +2746,7 @@ function useSequencer() {
     stopPreview,
     removeSampleInstrument,
     addSampleTrack,
+    addSampleTrackWithSample,
     removeSampleTrack,
     setSampleTrackSample,
     setSampleTrackPlaybackMode,
