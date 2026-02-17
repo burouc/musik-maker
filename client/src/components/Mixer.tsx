@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, DistortionMode, ChorusEffectParams, CompressorEffectParams, SendChannel, MixerTrack as MixerTrackType, EQBand, EQBandType } from '../types';
+import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, DistortionMode, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, SendChannel, MixerTrack as MixerTrackType, EQBand, EQBandType } from '../types';
 import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS, MAX_MIXER_TRACKS } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
@@ -265,6 +265,79 @@ const InsertEffectEditor: React.FC<{
               <input type="range" min={0} max={1} step={0.01} value={p.depth}
                 onChange={(e) => onUpdateParams(channelId, effect.id, { depth: parseFloat(e.target.value) })} />
               <span>{Math.round(p.depth * 100)}%</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Mix</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.mix}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { mix: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.mix * 100)}%</span>
+            </div>
+          </>
+        );
+      }
+      case 'flanger': {
+        const p = effect.params as FlangerEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Rate</label>
+              <input type="range" min={0.05} max={5} step={0.05} value={p.rate}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { rate: parseFloat(e.target.value) })} />
+              <span>{p.rate.toFixed(2)}Hz</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Depth</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.depth}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { depth: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.depth * 100)}%</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Feedback</label>
+              <input type="range" min={-0.95} max={0.95} step={0.01} value={p.feedback}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { feedback: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.feedback * 100)}%</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Mix</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.mix}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { mix: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.mix * 100)}%</span>
+            </div>
+          </>
+        );
+      }
+      case 'phaser': {
+        const p = effect.params as PhaserEffectParams;
+        return (
+          <>
+            <div className="insert-fx-param">
+              <label>Rate</label>
+              <input type="range" min={0.05} max={10} step={0.05} value={p.rate}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { rate: parseFloat(e.target.value) })} />
+              <span>{p.rate.toFixed(2)}Hz</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Depth</label>
+              <input type="range" min={0} max={1} step={0.01} value={p.depth}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { depth: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.depth * 100)}%</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Feedback</label>
+              <input type="range" min={-0.95} max={0.95} step={0.01} value={p.feedback}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { feedback: parseFloat(e.target.value) })} />
+              <span>{Math.round(p.feedback * 100)}%</span>
+            </div>
+            <div className="insert-fx-param">
+              <label>Stages</label>
+              <select value={p.stages}
+                onChange={(e) => onUpdateParams(channelId, effect.id, { stages: parseInt(e.target.value) })}>
+                <option value={2}>2</option>
+                <option value={4}>4</option>
+                <option value={6}>6</option>
+                <option value={8}>8</option>
+                <option value={12}>12</option>
+              </select>
             </div>
             <div className="insert-fx-param">
               <label>Mix</label>

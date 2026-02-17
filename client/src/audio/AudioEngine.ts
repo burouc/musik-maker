@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, CompressorEffectParams, SendChannel, MixerTrack, EQBand } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, SendChannel, MixerTrack, EQBand } from '../types';
 
 /** Accepted MIME types for sample loading */
 const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {
@@ -642,6 +642,10 @@ class AudioEngine {
         return this.createDistortionEffect(fx.params as DistortionEffectParams);
       case 'chorus':
         return this.createChorusEffect(fx.params as ChorusEffectParams);
+      case 'flanger':
+        return this.createFlangerEffect(fx.params as FlangerEffectParams);
+      case 'phaser':
+        return this.createPhaserEffect(fx.params as PhaserEffectParams);
       case 'compressor':
         return this.createCompressorEffect(fx.params as CompressorEffectParams);
     }
@@ -818,6 +822,119 @@ class AudioEngine {
     dryGain.connect(outputMerge);
 
     return { nodes: [inputSplitter, delay, lfo, lfoGain, wetGain, dryGain, outputMerge], inputNode: inputSplitter, outputNode: outputMerge };
+  }
+
+  private createFlangerEffect(params: FlangerEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const inputSplitter = this.context.createGain();
+    inputSplitter.gain.value = 1;
+
+    // Flanger uses shorter delay times than chorus (0.001–0.01s range)
+    const delay = this.context.createDelay(0.02);
+    delay.delayTime.value = 0.005;
+
+    const lfo = this.context.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = Math.max(0.05, Math.min(5, params.rate));
+
+    const lfoGain = this.context.createGain();
+    // Modulate delay time around 5ms center, depth scales the sweep
+    lfoGain.gain.value = Math.max(0, Math.min(1, params.depth)) * 0.004;
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(delay.delayTime);
+    lfo.start();
+
+    // Feedback loop for the metallic flanging character
+    const feedbackGain = this.context.createGain();
+    feedbackGain.gain.value = Math.max(-0.95, Math.min(0.95, params.feedback));
+    delay.connect(feedbackGain);
+    feedbackGain.connect(delay);
+
+    const wetGain = this.context.createGain();
+    wetGain.gain.value = Math.max(0, Math.min(1, params.mix));
+
+    const dryGain = this.context.createGain();
+    dryGain.gain.value = 1 - Math.max(0, Math.min(1, params.mix));
+
+    const outputMerge = this.context.createGain();
+    outputMerge.gain.value = 1;
+
+    inputSplitter.connect(delay);
+    delay.connect(wetGain);
+    wetGain.connect(outputMerge);
+    inputSplitter.connect(dryGain);
+    dryGain.connect(outputMerge);
+
+    return { nodes: [inputSplitter, delay, lfo, lfoGain, feedbackGain, wetGain, dryGain, outputMerge], inputNode: inputSplitter, outputNode: outputMerge };
+  }
+
+  private createPhaserEffect(params: PhaserEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {
+    const inputSplitter = this.context.createGain();
+    inputSplitter.gain.value = 1;
+
+    // Create all-pass filter stages for the phase-shifting effect
+    const numStages = [2, 4, 6, 8, 12].includes(params.stages) ? params.stages : 4;
+    const allPassFilters: BiquadFilterNode[] = [];
+
+    // Base frequency range for all-pass sweep (200Hz–4000Hz)
+    const baseFreq = 1000;
+    for (let i = 0; i < numStages; i++) {
+      const allPass = this.context.createBiquadFilter();
+      allPass.type = 'allpass';
+      allPass.frequency.value = baseFreq;
+      allPass.Q.value = 0.707;
+      allPassFilters.push(allPass);
+    }
+
+    // Chain all-pass filters in series
+    for (let i = 0; i < allPassFilters.length - 1; i++) {
+      allPassFilters[i].connect(allPassFilters[i + 1]);
+    }
+
+    // LFO to modulate all-pass filter frequencies
+    const lfo = this.context.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = Math.max(0.05, Math.min(10, params.rate));
+
+    const depth = Math.max(0, Math.min(1, params.depth));
+    // Each all-pass filter gets its own LFO gain to modulate frequency
+    const lfoGains: GainNode[] = [];
+    for (let i = 0; i < allPassFilters.length; i++) {
+      const lfoGain = this.context.createGain();
+      // Sweep range: depth controls how far the frequency sweeps (up to ±3000Hz)
+      lfoGain.gain.value = depth * 3000;
+      lfo.connect(lfoGain);
+      lfoGain.connect(allPassFilters[i].frequency);
+      lfoGains.push(lfoGain);
+    }
+    lfo.start();
+
+    // Feedback from the last all-pass stage back into the first
+    const feedbackGain = this.context.createGain();
+    feedbackGain.gain.value = Math.max(-0.95, Math.min(0.95, params.feedback));
+    allPassFilters[allPassFilters.length - 1].connect(feedbackGain);
+    feedbackGain.connect(allPassFilters[0]);
+
+    const wetGain = this.context.createGain();
+    wetGain.gain.value = Math.max(0, Math.min(1, params.mix));
+
+    const dryGain = this.context.createGain();
+    dryGain.gain.value = 1 - Math.max(0, Math.min(1, params.mix));
+
+    const outputMerge = this.context.createGain();
+    outputMerge.gain.value = 1;
+
+    // Wet path: input → all-pass chain → wetGain → merge
+    inputSplitter.connect(allPassFilters[0]);
+    allPassFilters[allPassFilters.length - 1].connect(wetGain);
+    wetGain.connect(outputMerge);
+
+    // Dry path: input → dryGain → merge
+    inputSplitter.connect(dryGain);
+    dryGain.connect(outputMerge);
+
+    const allNodes: AudioNode[] = [inputSplitter, ...allPassFilters, lfo, ...lfoGains, feedbackGain, wetGain, dryGain, outputMerge];
+    return { nodes: allNodes, inputNode: inputSplitter, outputNode: outputMerge };
   }
 
   private createCompressorEffect(params: CompressorEffectParams): { nodes: AudioNode[]; inputNode: AudioNode; outputNode: AudioNode } {

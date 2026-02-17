@@ -131,7 +131,7 @@ export interface DelaySettings {
 export type FilterType = 'lowpass' | 'highpass' | 'bandpass';
 
 /** Available insert effect types for mixer channel effect slots */
-export type InsertEffectType = 'filter' | 'reverb' | 'delay' | 'distortion' | 'chorus' | 'compressor';
+export type InsertEffectType = 'filter' | 'reverb' | 'delay' | 'distortion' | 'chorus' | 'flanger' | 'phaser' | 'compressor';
 
 /** Maximum number of insert effect slots per mixer channel */
 export const MAX_INSERT_EFFECTS = 8;
@@ -239,6 +239,30 @@ export interface ChorusEffectParams {
   mix: number;
 }
 
+export interface FlangerEffectParams {
+  /** LFO rate in Hz (0.05–5) */
+  rate: number;
+  /** Depth of modulation (0–1) */
+  depth: number;
+  /** Feedback amount (−0.95 to 0.95, negative = inverted) */
+  feedback: number;
+  /** Wet/dry mix (0–1) */
+  mix: number;
+}
+
+export interface PhaserEffectParams {
+  /** LFO rate in Hz (0.05–10) */
+  rate: number;
+  /** Depth of modulation (0–1) */
+  depth: number;
+  /** Feedback amount (−0.95 to 0.95) */
+  feedback: number;
+  /** Number of all-pass stages: 2, 4, 6, 8, or 12 */
+  stages: number;
+  /** Wet/dry mix (0–1) */
+  mix: number;
+}
+
 export interface CompressorEffectParams {
   /** Threshold in dB (−60 to 0) */
   threshold: number;
@@ -258,6 +282,8 @@ export type InsertEffectParams =
   | DelayEffectParams
   | DistortionEffectParams
   | ChorusEffectParams
+  | FlangerEffectParams
+  | PhaserEffectParams
   | CompressorEffectParams;
 
 /** A single insert effect slot on a mixer channel */
@@ -279,6 +305,8 @@ export const DEFAULT_EFFECT_PARAMS: Record<InsertEffectType, InsertEffectParams>
   delay: { time: 0.25, feedback: 0.3, mix: 0.3 } as DelayEffectParams,
   distortion: { mode: 'distortion', drive: 20, tone: 8000, mix: 1, outputGain: 0.7 } as DistortionEffectParams,
   chorus: { rate: 1.5, depth: 0.5, mix: 0.5 } as ChorusEffectParams,
+  flanger: { rate: 0.5, depth: 0.7, feedback: 0.5, mix: 0.5 } as FlangerEffectParams,
+  phaser: { rate: 0.5, depth: 0.7, feedback: 0.5, stages: 4, mix: 0.5 } as PhaserEffectParams,
   compressor: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, gain: 0 } as CompressorEffectParams,
 };
 
