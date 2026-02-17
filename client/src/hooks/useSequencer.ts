@@ -70,6 +70,9 @@ const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
   filterEnvAmount: 0,
   lfo1: { enabled: false, waveform: 'sine', rate: 2, depth: 0.5, target: 'filter' },
   lfo2: { enabled: false, waveform: 'sine', rate: 4, depth: 0.5, target: 'volume' },
+  unisonVoices: 1,
+  unisonSpread: 20,
+  unisonPan: 0.5,
 };
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {

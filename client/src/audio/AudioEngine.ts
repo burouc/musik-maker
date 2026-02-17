@@ -251,69 +251,12 @@ class AudioEngine {
     const cutoff = settings?.filterCutoff ?? Math.min(freq * 4, 12000);
     const resonance = settings?.filterResonance ?? 1;
 
-    // Oscillator 1 (with octave offset)
-    const osc1 = this.context.createOscillator();
-    osc1.type = osc1Type;
-    osc1.frequency.setValueAtTime(freq * Math.pow(2, osc1Octave), now);
+    // Unison settings
+    const unisonVoices = settings?.unisonVoices ?? 1;
+    const unisonSpread = settings?.unisonSpread ?? 20;
+    const unisonPanSpread = settings?.unisonPan ?? 0.5;
 
-    // Oscillator 2 (detuned, with octave offset)
-    const osc2 = this.context.createOscillator();
-    osc2.type = osc2Type;
-    osc2.frequency.setValueAtTime(freq * Math.pow(2, osc2Octave), now);
-    osc2.detune.setValueAtTime(detuneCents, now);
-
-    // Oscillator mix gains (distribute between osc1/osc2, with osc3 mixed in additively)
-    const osc1Gain = this.context.createGain();
-    osc1Gain.gain.value = 1 - osc2Mix;
-    const osc2Gain = this.context.createGain();
-    osc2Gain.gain.value = osc2Mix;
-
-    // Oscillator 3 (optional, with its own detune and octave)
-    let osc3: OscillatorNode | null = null;
-    let osc3Gain: GainNode | null = null;
-    if (osc3Enabled && osc3Mix > 0) {
-      osc3 = this.context.createOscillator();
-      osc3.type = osc3Type;
-      osc3.frequency.setValueAtTime(freq * Math.pow(2, osc3Octave), now);
-      osc3.detune.setValueAtTime(osc3Detune, now);
-
-      osc3Gain = this.context.createGain();
-      osc3Gain.gain.value = osc3Mix;
-    }
-
-    // Low-pass filter (subtractive)
-    const filter = this.context.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.Q.setValueAtTime(resonance, now);
-
-    // Filter envelope
-    const filterEnvAmount = settings?.filterEnvAmount ?? 0;
-    if (filterEnvAmount > 0) {
-      const fAttack = settings?.filterEnvAttack ?? 0.005;
-      const fDecay = settings?.filterEnvDecay ?? 0.3;
-      const fSustainLevel = settings?.filterEnvSustain ?? 0;
-      const fRelease = settings?.filterEnvRelease ?? 0.15;
-
-      // Envelope sweeps from cutoff up to cutoff + amount (in Hz, exponential)
-      const peakCutoff = Math.min(cutoff * Math.pow(2, filterEnvAmount / 12), 20000);
-      const sustainCutoff = cutoff + (peakCutoff - cutoff) * fSustainLevel;
-
-      const fAttackEnd = now + fAttack;
-      const fDecayEnd = fAttackEnd + fDecay;
-      const fReleaseStart = now + duration;
-      const fReleaseEnd = fReleaseStart + fRelease;
-
-      filter.frequency.setValueAtTime(cutoff, now);
-      filter.frequency.linearRampToValueAtTime(peakCutoff, fAttackEnd);
-      filter.frequency.linearRampToValueAtTime(sustainCutoff, fDecayEnd);
-      filter.frequency.setValueAtTime(sustainCutoff, fReleaseStart);
-      filter.frequency.linearRampToValueAtTime(cutoff, fReleaseEnd);
-    } else {
-      filter.frequency.setValueAtTime(cutoff, now);
-    }
-
-    // ADSR envelope
-    const gain = this.context.createGain();
+    // ADSR envelope params (shared across all unison voices)
     const attack = settings?.ampAttack ?? 0.005;
     const decay = settings?.ampDecay ?? 0.05;
     const sustainLevel = (settings?.ampSustain ?? 0.7) * volume;
@@ -324,29 +267,127 @@ class AudioEngine {
     const releaseStart = now + duration;
     const releaseEnd = releaseStart + release;
 
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(volume, attackEnd);
-    gain.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
-    gain.gain.setValueAtTime(sustainLevel, releaseStart);
-    gain.gain.exponentialRampToValueAtTime(0.001, releaseEnd);
+    // Volume compensation: 1/sqrt(N) to maintain perceived loudness
+    const voiceGainCompensation = 1 / Math.sqrt(unisonVoices);
 
-    osc1.connect(osc1Gain);
-    osc2.connect(osc2Gain);
-    osc1Gain.connect(filter);
-    osc2Gain.connect(filter);
-    if (osc3 && osc3Gain) {
-      osc3.connect(osc3Gain);
-      osc3Gain.connect(filter);
+    // Collect all oscillator nodes for starting/stopping
+    const allOscillators: OscillatorNode[] = [];
+    // Collect per-voice nodes for LFO connections
+    const voiceNodes: Array<{
+      osc1: OscillatorNode;
+      osc2: OscillatorNode;
+      osc3: OscillatorNode | null;
+      filter: BiquadFilterNode;
+      gain: GainNode;
+      panNode: StereoPannerNode;
+    }> = [];
+
+    for (let v = 0; v < unisonVoices; v++) {
+      // Detune offset: evenly spread across [-spread/2, +spread/2]
+      const detuneOffset = unisonVoices === 1
+        ? 0
+        : ((v / (unisonVoices - 1)) - 0.5) * unisonSpread;
+
+      // Pan offset: spread voices left to right
+      const panOffset = unisonVoices === 1
+        ? 0
+        : ((v / (unisonVoices - 1)) - 0.5) * unisonPanSpread * 2;
+
+      // Oscillator 1 (with octave offset + unison detune)
+      const osc1 = this.context.createOscillator();
+      osc1.type = osc1Type;
+      osc1.frequency.setValueAtTime(freq * Math.pow(2, osc1Octave), now);
+      osc1.detune.setValueAtTime(detuneOffset, now);
+
+      // Oscillator 2 (detuned, with octave offset + unison detune)
+      const osc2 = this.context.createOscillator();
+      osc2.type = osc2Type;
+      osc2.frequency.setValueAtTime(freq * Math.pow(2, osc2Octave), now);
+      osc2.detune.setValueAtTime(detuneCents + detuneOffset, now);
+
+      // Oscillator mix gains
+      const osc1Gain = this.context.createGain();
+      osc1Gain.gain.value = 1 - osc2Mix;
+      const osc2Gain = this.context.createGain();
+      osc2Gain.gain.value = osc2Mix;
+
+      // Oscillator 3 (optional, with its own detune and octave + unison detune)
+      let osc3: OscillatorNode | null = null;
+      let osc3GainNode: GainNode | null = null;
+      if (osc3Enabled && osc3Mix > 0) {
+        osc3 = this.context.createOscillator();
+        osc3.type = osc3Type;
+        osc3.frequency.setValueAtTime(freq * Math.pow(2, osc3Octave), now);
+        osc3.detune.setValueAtTime(osc3Detune + detuneOffset, now);
+
+        osc3GainNode = this.context.createGain();
+        osc3GainNode.gain.value = osc3Mix;
+      }
+
+      // Low-pass filter (subtractive)
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.setValueAtTime(resonance, now);
+
+      // Filter envelope
+      const filterEnvAmount = settings?.filterEnvAmount ?? 0;
+      if (filterEnvAmount > 0) {
+        const fAttack = settings?.filterEnvAttack ?? 0.005;
+        const fDecay = settings?.filterEnvDecay ?? 0.3;
+        const fSustainLevel = settings?.filterEnvSustain ?? 0;
+        const fRelease = settings?.filterEnvRelease ?? 0.15;
+
+        const peakCutoff = Math.min(cutoff * Math.pow(2, filterEnvAmount / 12), 20000);
+        const sustainCutoff = cutoff + (peakCutoff - cutoff) * fSustainLevel;
+
+        const fAttackEnd = now + fAttack;
+        const fDecayEnd = fAttackEnd + fDecay;
+        const fReleaseStart = now + duration;
+        const fReleaseEnd = fReleaseStart + fRelease;
+
+        filter.frequency.setValueAtTime(cutoff, now);
+        filter.frequency.linearRampToValueAtTime(peakCutoff, fAttackEnd);
+        filter.frequency.linearRampToValueAtTime(sustainCutoff, fDecayEnd);
+        filter.frequency.setValueAtTime(sustainCutoff, fReleaseStart);
+        filter.frequency.linearRampToValueAtTime(cutoff, fReleaseEnd);
+      } else {
+        filter.frequency.setValueAtTime(cutoff, now);
+      }
+
+      // ADSR envelope (with unison gain compensation)
+      const gain = this.context.createGain();
+      const voiceVol = volume * voiceGainCompensation;
+      const voiceSustain = sustainLevel * voiceGainCompensation;
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(voiceVol, attackEnd);
+      gain.gain.linearRampToValueAtTime(voiceSustain, decayEnd);
+      gain.gain.setValueAtTime(voiceSustain, releaseStart);
+      gain.gain.exponentialRampToValueAtTime(0.001, releaseEnd);
+
+      // Connect oscillators → filter → gain → pan → master
+      osc1.connect(osc1Gain);
+      osc2.connect(osc2Gain);
+      osc1Gain.connect(filter);
+      osc2Gain.connect(filter);
+      if (osc3 && osc3GainNode) {
+        osc3.connect(osc3GainNode);
+        osc3GainNode.connect(filter);
+      }
+      filter.connect(gain);
+
+      const panNode = this.context.createStereoPanner();
+      panNode.pan.setValueAtTime(panOffset, now);
+      gain.connect(panNode);
+      panNode.connect(this.masterGain);
+
+      allOscillators.push(osc1, osc2);
+      if (osc3) allOscillators.push(osc3);
+
+      voiceNodes.push({ osc1, osc2, osc3, filter, gain, panNode });
     }
-    filter.connect(gain);
 
-    // Output chain: gain → panNode → masterGain (pan node needed for LFO pan modulation)
-    const panNode = this.context.createStereoPanner();
-    panNode.pan.setValueAtTime(0, now);
-    gain.connect(panNode);
-    panNode.connect(this.masterGain);
-
-    // Apply LFO modulation
+    // Apply LFO modulation (shared LFOs connected to all unison voices)
     const lfoNodes: OscillatorNode[] = [];
     for (const lfo of [settings?.lfo1, settings?.lfo2]) {
       if (!lfo || !lfo.enabled || lfo.depth <= 0) continue;
@@ -359,41 +400,43 @@ class AudioEngine {
 
       switch (lfo.target) {
         case 'pitch': {
-          // Modulate oscillator frequency via detune (depth maps to 0–200 cents)
           lfoGain.gain.setValueAtTime(lfo.depth * 200, now);
           lfoOsc.connect(lfoGain);
-          lfoGain.connect(osc1.detune);
-          lfoGain.connect(osc2.detune);
-          if (osc3) lfoGain.connect(osc3.detune);
+          for (const vn of voiceNodes) {
+            lfoGain.connect(vn.osc1.detune);
+            lfoGain.connect(vn.osc2.detune);
+            if (vn.osc3) lfoGain.connect(vn.osc3.detune);
+          }
           break;
         }
         case 'filter': {
-          // Modulate filter cutoff frequency (depth maps to 0–4000 Hz swing)
           lfoGain.gain.setValueAtTime(lfo.depth * 4000, now);
           lfoOsc.connect(lfoGain);
-          lfoGain.connect(filter.frequency);
+          for (const vn of voiceNodes) {
+            lfoGain.connect(vn.filter.frequency);
+          }
           break;
         }
         case 'volume': {
-          // Modulate gain (tremolo). We use a secondary gain node to avoid
-          // interfering with the ADSR envelope.
-          // LFO output range is −1..+1, so depth*0.5 means ±50% volume swing
-          const tremoloGain = this.context.createGain();
-          tremoloGain.gain.setValueAtTime(1, now);
           lfoGain.gain.setValueAtTime(lfo.depth * 0.5, now);
           lfoOsc.connect(lfoGain);
-          lfoGain.connect(tremoloGain.gain);
-          // Re-route: gain → tremoloGain → panNode
-          gain.disconnect(panNode);
-          gain.connect(tremoloGain);
-          tremoloGain.connect(panNode);
+          for (const vn of voiceNodes) {
+            const tremoloGain = this.context.createGain();
+            tremoloGain.gain.setValueAtTime(1, now);
+            lfoGain.connect(tremoloGain.gain);
+            // Re-route: gain → tremoloGain → panNode
+            vn.gain.disconnect(vn.panNode);
+            vn.gain.connect(tremoloGain);
+            tremoloGain.connect(vn.panNode);
+          }
           break;
         }
         case 'pan': {
-          // Modulate stereo pan (auto-pan). depth maps to 0–1 pan range
           lfoGain.gain.setValueAtTime(lfo.depth, now);
           lfoOsc.connect(lfoGain);
-          lfoGain.connect(panNode.pan);
+          for (const vn of voiceNodes) {
+            lfoGain.connect(vn.panNode.pan);
+          }
           break;
         }
       }
@@ -403,13 +446,10 @@ class AudioEngine {
       lfoNodes.push(lfoOsc);
     }
 
-    osc1.start(now);
-    osc2.start(now);
-    osc1.stop(releaseEnd + 0.01);
-    osc2.stop(releaseEnd + 0.01);
-    if (osc3) {
-      osc3.start(now);
-      osc3.stop(releaseEnd + 0.01);
+    // Start and stop all oscillators
+    for (const osc of allOscillators) {
+      osc.start(now);
+      osc.stop(releaseEnd + 0.01);
     }
   }
 

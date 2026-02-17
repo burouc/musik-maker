@@ -412,6 +412,12 @@ export interface SynthSettings {
   lfo1: LfoSettings;
   /** LFO 2 settings (second independent LFO) */
   lfo2: LfoSettings;
+  /** Number of unison voices (1 = off, 2–8 = stacked voices) */
+  unisonVoices: number;
+  /** Detune spread across unison voices in cents (0–100) */
+  unisonSpread: number;
+  /** Stereo pan spread for unison voices (0 = mono, 1 = full width) */
+  unisonPan: number;
 }
 
 /** Supported audio file formats for sample loading */

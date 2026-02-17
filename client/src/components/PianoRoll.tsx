@@ -1382,6 +1382,49 @@ function PianoRoll({
 
           <div className="synth-control-divider" />
 
+          {/* Unison controls */}
+          <div className="synth-control-group">
+            <label className="synth-label">Uni V</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={1}
+              max={8}
+              step={1}
+              value={synthSettings.unisonVoices}
+              onChange={(e) => onSynthSettingsChange({ unisonVoices: Number(e.target.value) })}
+              title={`Unison: ${synthSettings.unisonVoices} voice${synthSettings.unisonVoices > 1 ? 's' : ''}`}
+            />
+          </div>
+          <div className="synth-control-group">
+            <label className="synth-label">Spread</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={synthSettings.unisonSpread}
+              onChange={(e) => onSynthSettingsChange({ unisonSpread: Number(e.target.value) })}
+              title={`Spread: ${synthSettings.unisonSpread} cents`}
+              disabled={synthSettings.unisonVoices <= 1}
+            />
+          </div>
+          <div className="synth-control-group">
+            <label className="synth-label">Width</label>
+            <input
+              type="range"
+              className="synth-slider"
+              min={0}
+              max={100}
+              value={Math.round(synthSettings.unisonPan * 100)}
+              onChange={(e) => onSynthSettingsChange({ unisonPan: Number(e.target.value) / 100 })}
+              title={`Stereo width: ${Math.round(synthSettings.unisonPan * 100)}%`}
+              disabled={synthSettings.unisonVoices <= 1}
+            />
+          </div>
+
+          <div className="synth-control-divider" />
+
           {/* LFO 1 & 2 controls */}
           {([['lfo1', synthSettings.lfo1], ['lfo2', synthSettings.lfo2]] as [keyof Pick<SynthSettings, 'lfo1' | 'lfo2'>, LfoSettings][]).map(([key, lfo]) => (
             <div key={key} className="synth-lfo-group">
