@@ -310,6 +310,23 @@ export const DEFAULT_EFFECT_PARAMS: Record<InsertEffectType, InsertEffectParams>
   compressor: { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, gain: 0 } as CompressorEffectParams,
 };
 
+/** Master bus limiter settings */
+export interface MasterLimiterSettings {
+  /** Whether the limiter is enabled */
+  enabled: boolean;
+  /** Threshold in dB (−24 to 0) */
+  threshold: number;
+  /** Release time in seconds (0.01–1) */
+  release: number;
+}
+
+/** Default master limiter settings */
+export const DEFAULT_MASTER_LIMITER: MasterLimiterSettings = {
+  enabled: true,
+  threshold: -1,
+  release: 0.1,
+};
+
 /** Filter parameters for the master filter effect */
 export interface FilterSettings {
   /** Send level: 0 (dry) to 1 (full send) */
@@ -324,6 +341,26 @@ export interface FilterSettings {
 
 /** Oscillator waveform type for the synth engine */
 export type OscillatorType = 'sine' | 'sawtooth' | 'square' | 'triangle';
+
+/** LFO waveform shape */
+export type LfoWaveform = 'sine' | 'sawtooth' | 'square' | 'triangle';
+
+/** LFO modulation routing target */
+export type LfoTarget = 'pitch' | 'filter' | 'volume' | 'pan';
+
+/** LFO settings for the synth engine */
+export interface LfoSettings {
+  /** Whether the LFO is active */
+  enabled: boolean;
+  /** LFO waveform shape */
+  waveform: LfoWaveform;
+  /** LFO rate in Hz (0.05–20) */
+  rate: number;
+  /** Modulation depth (0–1) */
+  depth: number;
+  /** Modulation target */
+  target: LfoTarget;
+}
 
 /** Synth settings stored per pattern (controls the piano roll synth voice) */
 export interface SynthSettings {
@@ -371,6 +408,10 @@ export interface SynthSettings {
   filterEnvRelease: number;
   /** Filter envelope modulation amount in semitones of cutoff (0–100), controls how far above the base cutoff the envelope sweeps */
   filterEnvAmount: number;
+  /** LFO 1 settings */
+  lfo1: LfoSettings;
+  /** LFO 2 settings (second independent LFO) */
+  lfo2: LfoSettings;
 }
 
 /** Supported audio file formats for sample loading */
@@ -486,6 +527,8 @@ export interface ProjectData {
   sendChannels: SendChannel[];
   /** Mixer tracks for channel routing */
   mixerTracks: MixerTrack[];
+  /** Master bus limiter settings */
+  masterLimiter: MasterLimiterSettings;
 }
 
 export type PlaybackMode = 'pattern' | 'song';
@@ -533,4 +576,6 @@ export interface SequencerState {
   sendChannels: SendChannel[];
   /** Mixer tracks for channel routing */
   mixerTracks: MixerTrack[];
+  /** Master bus limiter settings */
+  masterLimiter: MasterLimiterSettings;
 }

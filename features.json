@@ -322,7 +322,7 @@
           "id": "sy-05",
           "priority": "P1",
           "title": "LFO modulation (route to pitch, filter, volume, pan)",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "sy-06",

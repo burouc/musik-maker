@@ -71,6 +71,7 @@ function App() {
     setMasterDelay,
     setTrackFilterSend,
     setMasterFilter,
+    setMasterLimiter,
     setSynthSettings,
     activePattern,
     audioEngine,
@@ -110,6 +111,14 @@ function App() {
     toggleSendChannelInsertEffect,
     updateSendChannelInsertEffectParams,
     moveSendChannelInsertEffect,
+    // Mixer tracks
+    addMixerTrack,
+    removeMixerTrack,
+    renameMixerTrack,
+    setMixerTrackVolume,
+    setMixerTrackPan,
+    setMixerTrackEQBand,
+    setMixerTrackEQEnabled,
     // Automation
     addAutomationLane,
     removeAutomationLane,
@@ -403,6 +412,7 @@ function App() {
             masterReverb={state.masterReverb}
             masterDelay={state.masterDelay}
             masterFilter={state.masterFilter}
+            masterLimiter={state.masterLimiter}
             audioEngine={audioEngine}
             onSetVolume={setTrackVolume}
             onSetPan={setTrackPan}
@@ -440,6 +450,14 @@ function App() {
             onToggleSendChannelInsertEffect={toggleSendChannelInsertEffect}
             onUpdateSendChannelInsertEffectParams={updateSendChannelInsertEffectParams}
             onMoveSendChannelInsertEffect={moveSendChannelInsertEffect}
+            mixerTracks={state.mixerTracks}
+            onAddMixerTrack={addMixerTrack}
+            onRemoveMixerTrack={removeMixerTrack}
+            onRenameMixerTrack={renameMixerTrack}
+            onSetMixerTrackVolume={setMixerTrackVolume}
+            onSetMixerTrackPan={setMixerTrackPan}
+            onSetMixerTrackEQBand={setMixerTrackEQBand}
+            onSetMixerTrackEQEnabled={setMixerTrackEQEnabled}
           />
         </ResizablePanel>
       )}

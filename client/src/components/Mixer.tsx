@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, DistortionMode, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, SendChannel, MixerTrack as MixerTrackType, EQBand, EQBandType } from '../types';
+import type { InstrumentName, Track, SampleTrack, ReverbSettings, DelaySettings, DelaySync, FilterSettings, FilterType, MasterLimiterSettings, InsertEffectType, InsertEffectParams, InsertEffect, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, DistortionMode, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, SendChannel, MixerTrack as MixerTrackType, EQBand, EQBandType } from '../types';
 import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS, MAX_MIXER_TRACKS } from '../types';
 import type AudioEngine from '../audio/AudioEngine';
 
@@ -34,6 +34,7 @@ interface MixerProps {
   masterReverb: ReverbSettings;
   masterDelay: DelaySettings;
   masterFilter: FilterSettings;
+  masterLimiter: MasterLimiterSettings;
   audioEngine: AudioEngine;
   onSetVolume: (trackId: InstrumentName, volume: number) => void;
   onSetPan: (trackId: InstrumentName, pan: number) => void;
@@ -47,6 +48,7 @@ interface MixerProps {
   onSetMasterDelay: (params: Partial<DelaySettings>) => void;
   onSetFilterSend: (trackId: InstrumentName, send: number) => void;
   onSetMasterFilter: (params: Partial<FilterSettings>) => void;
+  onSetMasterLimiter: (params: Partial<MasterLimiterSettings>) => void;
   onSetSampleVolume: (trackId: string, volume: number) => void;
   onSetSamplePan: (trackId: string, pan: number) => void;
   onToggleSampleMute: (trackId: string) => void;
@@ -590,6 +592,7 @@ const Mixer: React.FC<MixerProps> = ({
   masterReverb,
   masterDelay,
   masterFilter,
+  masterLimiter,
   audioEngine,
   onSetVolume,
   onSetPan,
@@ -603,6 +606,7 @@ const Mixer: React.FC<MixerProps> = ({
   onSetMasterDelay,
   onSetFilterSend,
   onSetMasterFilter,
+  onSetMasterLimiter,
   onSetSampleVolume,
   onSetSamplePan,
   onToggleSampleMute,
@@ -932,6 +936,46 @@ const Mixer: React.FC<MixerProps> = ({
         <span className="mixer-volume-display">
           {Math.round(masterVolume * 100)}%
         </span>
+      </div>
+
+      <div className="mixer-channel mixer-limiter-channel">
+        <label className="mixer-channel-name mixer-limiter-title">Limiter</label>
+        <div className="mixer-limiter-params">
+          <div className="mixer-limiter-param">
+            <label>
+              <input
+                type="checkbox"
+                checked={masterLimiter.enabled}
+                onChange={(e) => onSetMasterLimiter({ enabled: e.target.checked })}
+              />
+              {' '}Enabled
+            </label>
+          </div>
+          <div className="mixer-limiter-param">
+            <label>Ceil</label>
+            <input
+              type="range"
+              min={-24}
+              max={0}
+              step={0.1}
+              value={masterLimiter.threshold}
+              onChange={(e) => onSetMasterLimiter({ threshold: parseFloat(e.target.value) })}
+            />
+            <span>{masterLimiter.threshold.toFixed(1)} dB</span>
+          </div>
+          <div className="mixer-limiter-param">
+            <label>Release</label>
+            <input
+              type="range"
+              min={0.01}
+              max={1}
+              step={0.01}
+              value={masterLimiter.release}
+              onChange={(e) => onSetMasterLimiter({ release: parseFloat(e.target.value) })}
+            />
+            <span>{Math.round(masterLimiter.release * 1000)}ms</span>
+          </div>
+        </div>
       </div>
 
       <div className="mixer-channel mixer-reverb-channel">

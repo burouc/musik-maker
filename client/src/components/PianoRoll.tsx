@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import type { PianoRollData, PianoNote, SynthSettings, OscillatorType, SnapResolution } from '../types';
+import type { PianoRollData, PianoNote, PianoRollTool, SynthSettings, OscillatorType, SnapResolution, LfoWaveform, LfoTarget, LfoSettings } from '../types';
 
 /** Note names in chromatic order */
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
@@ -98,6 +98,24 @@ function snapMinDuration(resolution: SnapResolution): number {
   return Math.max(1, snapStepSize(resolution));
 }
 
+/** Tool definitions with labels, shortcuts and descriptions */
+const TOOLS: { id: PianoRollTool; label: string; shortcut: string; title: string }[] = [
+  { id: 'draw', label: 'Draw', shortcut: 'D', title: 'Draw tool (D) — Click to place notes, drag to set duration' },
+  { id: 'select', label: 'Select', shortcut: 'S', title: 'Select tool (S) — Click/drag to select, move, and resize notes' },
+  { id: 'slice', label: 'Slice', shortcut: 'C', title: 'Slice tool (C) — Click on a note to split it at that position' },
+  { id: 'paint', label: 'Paint', shortcut: 'P', title: 'Paint tool (P) — Click/drag to paint notes continuously' },
+  { id: 'erase', label: 'Erase', shortcut: 'E', title: 'Erase tool (E) — Click/drag to erase notes' },
+];
+
+/** Cursor classes per tool */
+const TOOL_CURSOR_CLASS: Record<PianoRollTool, string> = {
+  draw: 'tool-draw',
+  select: 'tool-select',
+  slice: 'tool-slice',
+  paint: 'tool-paint',
+  erase: 'tool-erase',
+};
+
 interface DragState {
   pitch: number;
   startStep: number;
@@ -147,6 +165,24 @@ const OSC_LABELS: Record<OscillatorType, string> = {
 
 const OSC_TYPES: OscillatorType[] = ['sine', 'sawtooth', 'square', 'triangle'];
 
+/** Display labels for LFO waveforms */
+const LFO_WAVEFORM_LABELS: Record<LfoWaveform, string> = {
+  sine: 'Sine',
+  sawtooth: 'Saw',
+  square: 'Square',
+  triangle: 'Tri',
+};
+const LFO_WAVEFORMS: LfoWaveform[] = ['sine', 'sawtooth', 'square', 'triangle'];
+
+/** Display labels for LFO targets */
+const LFO_TARGET_LABELS: Record<LfoTarget, string> = {
+  pitch: 'Pitch',
+  filter: 'Filter',
+  volume: 'Vol',
+  pan: 'Pan',
+};
+const LFO_TARGETS: LfoTarget[] = ['pitch', 'filter', 'volume', 'pan'];
+
 interface PianoRollProps {
   pianoRoll: PianoRollData;
   stepCount: number;
@@ -156,6 +192,7 @@ interface PianoRollProps {
   onAddNote: (pitch: number, step: number, duration: number) => void;
   onDeleteNote: (noteId: string) => void;
   onUpdateNote: (noteId: string, updates: { step?: number; duration?: number }) => void;
+  onSliceNote: (noteId: string, sliceStep: number) => void;
   onPreviewNote: (pitch: number) => void;
   onMoveNotes: (noteIds: Set<string>, stepDelta: number, pitchDelta: number) => void;
   onPasteNotes: (notes: Omit<PianoNote, 'id'>[]) => void;
@@ -172,12 +209,18 @@ function PianoRoll({
   onAddNote,
   onDeleteNote,
   onUpdateNote,
+  onSliceNote,
   onPreviewNote,
   onMoveNotes,
   onPasteNotes,
   onUpdateNoteVelocity,
   onSynthSettingsChange,
 }: PianoRollProps) {
+  const [activeTool, setActiveTool] = useState<PianoRollTool>('draw');
+  /** Erase drag: true while the erase tool is actively dragging */
+  const eraseDragRef = useRef(false);
+  /** Paint drag: true while the paint tool is actively dragging */
+  const paintDragRef = useRef(false);
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const [resize, setResize] = useState<ResizeState | null>(null);
@@ -301,7 +344,115 @@ function PianoRoll({
     (pitch: number, step: number, e: React.MouseEvent) => {
       e.preventDefault();
 
-      // Check for resize edge first
+      const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
+
+      // ── Erase tool ──────────────────────────────────────────────
+      if (activeTool === 'erase') {
+        if (coveredNote) {
+          onDeleteNote(coveredNote.id);
+        }
+        eraseDragRef.current = true;
+        return;
+      }
+
+      // ── Slice tool ──────────────────────────────────────────────
+      if (activeTool === 'slice') {
+        if (coveredNote && step > coveredNote.step && step < coveredNote.step + coveredNote.duration) {
+          onSliceNote(coveredNote.id, step);
+        }
+        return;
+      }
+
+      // ── Paint tool ──────────────────────────────────────────────
+      if (activeTool === 'paint') {
+        if (!coveredNote) {
+          const dur = snapEnabled ? Math.max(1, Math.round(snapStepSize(snapResolution))) : 1;
+          const snappedStep = snapEnabled ? Math.round(snapFloor(step, snapResolution)) : step;
+          onAddNote(pitch, snappedStep, dur);
+          onPreviewNote(pitch);
+        }
+        paintDragRef.current = true;
+        return;
+      }
+
+      // ── Select tool ─────────────────────────────────────────────
+      if (activeTool === 'select') {
+        // Check for resize edge first
+        const edgeHit = detectEdge(e, pitch, step);
+        if (edgeHit) {
+          if (!e.shiftKey) {
+            setSelectedNoteIds(new Set([edgeHit.note.id]));
+          } else {
+            setSelectedNoteIds((prev) => {
+              const next = new Set(prev);
+              next.add(edgeHit.note.id);
+              return next;
+            });
+          }
+          const newResize: ResizeState = {
+            noteId: edgeHit.note.id,
+            pitch: edgeHit.note.pitch,
+            edge: edgeHit.edge,
+            origStep: edgeHit.note.step,
+            origDuration: edgeHit.note.duration,
+            currentStep: step,
+          };
+          resizeRef.current = newResize;
+          setResize(newResize);
+          return;
+        }
+
+        if (coveredNote) {
+          if (e.shiftKey) {
+            setSelectedNoteIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(coveredNote.id)) {
+                next.delete(coveredNote.id);
+              } else {
+                next.add(coveredNote.id);
+              }
+              return next;
+            });
+          } else if (selectedNoteIds.has(coveredNote.id)) {
+            const newMove: MoveState = {
+              startPitch: pitch,
+              startStep: step,
+              currentPitch: pitch,
+              currentStep: step,
+            };
+            moveRef.current = newMove;
+            setMove(newMove);
+          } else {
+            setSelectedNoteIds(new Set([coveredNote.id]));
+            const newMove: MoveState = {
+              startPitch: pitch,
+              startStep: step,
+              currentPitch: pitch,
+              currentStep: step,
+            };
+            moveRef.current = newMove;
+            setMove(newMove);
+          }
+          return;
+        }
+
+        // Empty space: start box select
+        if (!e.shiftKey) {
+          setSelectedNoteIds(new Set());
+        }
+        const newBox: BoxSelectState = {
+          startPitch: pitch,
+          startStep: step,
+          currentPitch: pitch,
+          currentStep: step,
+        };
+        boxSelectRef.current = newBox;
+        setBoxSelect(newBox);
+        return;
+      }
+
+      // ── Draw tool (default) ─────────────────────────────────────
+      // On a note: check for resize edge first
       const edgeHit = detectEdge(e, pitch, step);
       if (edgeHit) {
         if (!e.shiftKey) {
@@ -326,11 +477,8 @@ function PianoRoll({
         return;
       }
 
-      // Check if there's an existing note covering this cell
-      const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
       if (coveredNote) {
         if (e.shiftKey) {
-          // Shift-click: toggle note in/out of selection
           setSelectedNoteIds((prev) => {
             const next = new Set(prev);
             if (next.has(coveredNote.id)) {
@@ -341,7 +489,6 @@ function PianoRoll({
             return next;
           });
         } else if (selectedNoteIds.has(coveredNote.id)) {
-          // Clicking an already-selected note: start move drag
           const newMove: MoveState = {
             startPitch: pitch,
             startStep: step,
@@ -351,7 +498,6 @@ function PianoRoll({
           moveRef.current = newMove;
           setMove(newMove);
         } else {
-          // Plain click on unselected note: select only this note, start move drag
           setSelectedNoteIds(new Set([coveredNote.id]));
           const newMove: MoveState = {
             startPitch: pitch,
@@ -365,9 +511,8 @@ function PianoRoll({
         return;
       }
 
-      // Empty space clicked
+      // Empty space: Ctrl/Cmd for box-select, otherwise start drawing
       if (e.ctrlKey || e.metaKey) {
-        // Ctrl/Cmd + drag on empty space: start box select
         if (!e.shiftKey) {
           setSelectedNoteIds(new Set());
         }
@@ -382,23 +527,21 @@ function PianoRoll({
         return;
       }
 
-      // Clicking empty space without modifier clears selection and starts note draw
       setSelectedNoteIds(new Set());
       onPreviewNote(pitch);
       const newDrag: DragState = { pitch, startStep: step, currentStep: step };
       dragRef.current = newDrag;
       setDrag(newDrag);
     },
-    [onPreviewNote],
+    [activeTool, onPreviewNote, onDeleteNote, onSliceNote, onAddNote, snapEnabled, snapResolution],
   );
 
-  /** Right-click on a note to delete it */
+  /** Right-click on a note to delete it (always available regardless of tool) */
   const handleCellContextMenu = useCallback(
     (pitch: number, step: number, e: React.MouseEvent) => {
       e.preventDefault();
       const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
       if (coveredNote) {
-        // If the right-clicked note is selected, delete all selected notes
         if (selectedNoteIds.has(coveredNote.id)) {
           for (const id of selectedNoteIds) {
             onDeleteNote(id);
@@ -414,6 +557,25 @@ function PianoRoll({
 
   const handleCellMouseEnter = useCallback(
     (pitch: number, step: number) => {
+      // Handle erase drag
+      if (eraseDragRef.current) {
+        const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
+        if (coveredNote) {
+          onDeleteNote(coveredNote.id);
+        }
+        return;
+      }
+      // Handle paint drag
+      if (paintDragRef.current) {
+        const coveredNote = cellCoverage.current.get(`${pitch}-${step}`);
+        if (!coveredNote) {
+          const dur = snapEnabled ? Math.max(1, Math.round(snapStepSize(snapResolution))) : 1;
+          const snappedStep = snapEnabled ? Math.round(snapFloor(step, snapResolution)) : step;
+          onAddNote(pitch, snappedStep, dur);
+          onPreviewNote(pitch);
+        }
+        return;
+      }
       // Handle box select drag
       if (boxSelectRef.current) {
         const updated = { ...boxSelectRef.current, currentPitch: pitch, currentStep: step };
@@ -444,10 +606,14 @@ function PianoRoll({
       dragRef.current = updated;
       setDrag(updated);
     },
-    [],
+    [onDeleteNote, onAddNote, onPreviewNote, snapEnabled, snapResolution],
   );
 
   const handleMouseUp = useCallback(() => {
+    // Reset paint/erase drag
+    eraseDragRef.current = false;
+    paintDragRef.current = false;
+
     // Handle box select completion
     const b = boxSelectRef.current;
     if (b) {
@@ -546,9 +712,19 @@ function PianoRoll({
     return () => window.removeEventListener('mouseup', onUp);
   }, [handleMouseUp]);
 
-  // Keyboard handler: Delete/Backspace, Escape, Ctrl+A
+  // Keyboard handler: Delete/Backspace, Escape, Ctrl+A, tool shortcuts
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // Tool switching shortcuts (single keys, not with modifiers)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        const lower = e.key.toLowerCase();
+        if (lower === 'd' && !e.shiftKey) { setActiveTool('draw'); return; }
+        if (lower === 's') { setActiveTool('select'); return; }
+        if (lower === 'c' && !e.shiftKey) { setActiveTool('slice'); return; }
+        if (lower === 'p') { setActiveTool('paint'); return; }
+        if (lower === 'e') { setActiveTool('erase'); return; }
+      }
+
       // Ctrl+A / Cmd+A: select all notes
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
@@ -835,6 +1011,18 @@ function PianoRoll({
       <div className="piano-roll-header">
         <div className="piano-roll-title-row">
           <div className="piano-roll-title">Piano Roll</div>
+          <div className="pr-tool-buttons">
+            {TOOLS.map((tool) => (
+              <button
+                key={tool.id}
+                className={`pr-tool-btn${activeTool === tool.id ? ' active' : ''}`}
+                onClick={() => setActiveTool(tool.id)}
+                title={tool.title}
+              >
+                {tool.label}
+              </button>
+            ))}
+          </div>
           <div className="pr-zoom-control">
             <span className="pr-zoom-label">H:</span>
             <div className="pr-zoom-buttons">
@@ -1191,6 +1379,79 @@ function PianoRoll({
               title={`Release: ${synthSettings.ampRelease >= 1 ? `${synthSettings.ampRelease.toFixed(1)}s` : `${Math.round(synthSettings.ampRelease * 1000)}ms`}`}
             />
           </div>
+
+          <div className="synth-control-divider" />
+
+          {/* LFO 1 & 2 controls */}
+          {([['lfo1', synthSettings.lfo1], ['lfo2', synthSettings.lfo2]] as [keyof Pick<SynthSettings, 'lfo1' | 'lfo2'>, LfoSettings][]).map(([key, lfo]) => (
+            <div key={key} className="synth-lfo-group">
+              <div className="synth-control-group">
+                <label className="synth-label">
+                  <input
+                    type="checkbox"
+                    checked={lfo.enabled}
+                    onChange={(e) => onSynthSettingsChange({ [key]: { ...lfo, enabled: e.target.checked } })}
+                  />
+                  {` ${key === 'lfo1' ? 'LFO 1' : 'LFO 2'}`}
+                </label>
+                <div className="synth-osc-buttons">
+                  {LFO_WAVEFORMS.map((w) => (
+                    <button
+                      key={w}
+                      className={`synth-osc-btn${lfo.waveform === w ? ' active' : ''}${!lfo.enabled ? ' disabled' : ''}`}
+                      onClick={() => lfo.enabled && onSynthSettingsChange({ [key]: { ...lfo, waveform: w } })}
+                      title={LFO_WAVEFORM_LABELS[w]}
+                      disabled={!lfo.enabled}
+                    >
+                      {LFO_WAVEFORM_LABELS[w]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="synth-control-group">
+                <label className="synth-label">Target</label>
+                <div className="synth-osc-buttons">
+                  {LFO_TARGETS.map((t) => (
+                    <button
+                      key={t}
+                      className={`synth-osc-btn${lfo.target === t ? ' active' : ''}${!lfo.enabled ? ' disabled' : ''}`}
+                      onClick={() => lfo.enabled && onSynthSettingsChange({ [key]: { ...lfo, target: t } })}
+                      title={LFO_TARGET_LABELS[t]}
+                      disabled={!lfo.enabled}
+                    >
+                      {LFO_TARGET_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="synth-control-group">
+                <label className="synth-label">Rate</label>
+                <input
+                  type="range"
+                  className="synth-slider"
+                  min={5}
+                  max={2000}
+                  value={Math.round(lfo.rate * 100)}
+                  onChange={(e) => onSynthSettingsChange({ [key]: { ...lfo, rate: Number(e.target.value) / 100 } })}
+                  title={`Rate: ${lfo.rate.toFixed(2)} Hz`}
+                  disabled={!lfo.enabled}
+                />
+              </div>
+              <div className="synth-control-group">
+                <label className="synth-label">Depth</label>
+                <input
+                  type="range"
+                  className="synth-slider"
+                  min={0}
+                  max={100}
+                  value={Math.round(lfo.depth * 100)}
+                  onChange={(e) => onSynthSettingsChange({ [key]: { ...lfo, depth: Number(e.target.value) / 100 } })}
+                  title={`Depth: ${Math.round(lfo.depth * 100)}%`}
+                  disabled={!lfo.enabled}
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
         {selectedNoteIds.size > 0 && (

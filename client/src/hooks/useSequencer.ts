@@ -23,8 +23,11 @@ import type {
   InsertEffectType,
   InsertEffectParams,
   SendChannel,
+  MixerTrack,
+  EQBand,
+  MasterLimiterSettings,
 } from '../types';
-import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS, DEFAULT_EFFECT_PARAMS } from '../types';
+import { MAX_INSERT_EFFECTS, MAX_SEND_CHANNELS, MAX_MIXER_TRACKS, DEFAULT_EFFECT_PARAMS, DEFAULT_EQ_BANDS, DEFAULT_MASTER_LIMITER } from '../types';
 import AudioEngine from '../audio/AudioEngine';
 
 const DEFAULT_STEP_COUNT = 16;
@@ -65,16 +68,18 @@ const DEFAULT_SYNTH_SETTINGS: SynthSettings = {
   filterEnvSustain: 0,
   filterEnvRelease: 0.15,
   filterEnvAmount: 0,
+  lfo1: { enabled: false, waveform: 'sine', rate: 2, depth: 0.5, target: 'filter' },
+  lfo2: { enabled: false, waveform: 'sine', rate: 4, depth: 0.5, target: 'volume' },
 };
 
 function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
   return [
-    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
-    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
-    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
-    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
-    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
-    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {} },
+    { id: 'kick', name: 'Kick', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
+    { id: 'snare', name: 'Snare', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
+    { id: 'hihat', name: 'Hi-Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
+    { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
+    { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
+    { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
   ];
 }
 
@@ -127,6 +132,8 @@ const INITIAL_STATE: SequencerState = {
   metronomeEnabled: false,
   swing: 0,
   sendChannels: [],
+  mixerTracks: [],
+  masterLimiter: { ...DEFAULT_MASTER_LIMITER },
 };
 
 const MAX_UNDO_HISTORY = 50;
@@ -1432,6 +1439,14 @@ function useSequencer() {
     }));
   }, []);
 
+  const setMasterLimiter = useCallback((params: Partial<MasterLimiterSettings>) => {
+    audioEngine.current.setMasterLimiter(params);
+    setState((prev) => ({
+      ...prev,
+      masterLimiter: { ...prev.masterLimiter, ...params },
+    }));
+  }, []);
+
   // -----------------------------------------------------------------------
   // Sample management
   // -----------------------------------------------------------------------
@@ -1508,6 +1523,7 @@ function useSequencer() {
         filterSend: 0,
         insertEffects: [],
         sends: {},
+        mixerTrackId: null,
       };
       return {
         ...prev,
@@ -2086,6 +2102,118 @@ function useSequencer() {
   );
 
   // -----------------------------------------------------------------------
+  // Mixer track routing actions
+  // -----------------------------------------------------------------------
+
+  const addMixerTrack = useCallback(() => {
+    setState((prev) => {
+      if (prev.mixerTracks.length >= MAX_MIXER_TRACKS) return prev;
+      const index = prev.mixerTracks.length + 1;
+      const id = `mixer-${Date.now()}`;
+      const eqBands = DEFAULT_EQ_BANDS.map((b) => ({ ...b }));
+      const newTrack: MixerTrack = {
+        id,
+        name: `Mixer ${index}`,
+        volume: 1,
+        pan: 0,
+        eqBands,
+        eqEnabled: true,
+      };
+      audioEngine.current.ensureMixerTrack(id, 1, 0, eqBands, true);
+      return { ...prev, mixerTracks: [...prev.mixerTracks, newTrack] };
+    });
+  }, []);
+
+  const removeMixerTrack = useCallback((mixerTrackId: string) => {
+    audioEngine.current.removeMixerTrack(mixerTrackId);
+    setState((prev) => ({
+      ...prev,
+      mixerTracks: prev.mixerTracks.filter((t) => t.id !== mixerTrackId),
+      // Clear routing for any channels assigned to this mixer track
+      patterns: prev.patterns.map((p) => ({
+        ...p,
+        tracks: p.tracks.map((t) =>
+          t.mixerTrackId === mixerTrackId ? { ...t, mixerTrackId: null } : t,
+        ),
+        sampleTracks: p.sampleTracks.map((t) =>
+          t.mixerTrackId === mixerTrackId ? { ...t, mixerTrackId: null } : t,
+        ),
+      })),
+    }));
+  }, []);
+
+  const renameMixerTrack = useCallback((mixerTrackId: string, name: string) => {
+    setState((prev) => ({
+      ...prev,
+      mixerTracks: prev.mixerTracks.map((t) =>
+        t.id === mixerTrackId ? { ...t, name } : t,
+      ),
+    }));
+  }, []);
+
+  const setMixerTrackVolume = useCallback((mixerTrackId: string, volume: number) => {
+    audioEngine.current.setMixerTrackVolume(mixerTrackId, volume);
+    setState((prev) => ({
+      ...prev,
+      mixerTracks: prev.mixerTracks.map((t) =>
+        t.id === mixerTrackId ? { ...t, volume } : t,
+      ),
+    }));
+  }, []);
+
+  const setMixerTrackPan = useCallback((mixerTrackId: string, pan: number) => {
+    audioEngine.current.setMixerTrackPan(mixerTrackId, pan);
+    setState((prev) => ({
+      ...prev,
+      mixerTracks: prev.mixerTracks.map((t) =>
+        t.id === mixerTrackId ? { ...t, pan } : t,
+      ),
+    }));
+  }, []);
+
+  const setChannelMixerRouting = useCallback((channelId: string, mixerTrackId: string | null) => {
+    audioEngine.current.setChannelMixerRouting(channelId, mixerTrackId);
+    setState((prev) => ({
+      ...prev,
+      patterns: prev.patterns.map((p) => ({
+        ...p,
+        tracks: p.tracks.map((t) =>
+          t.id === channelId ? { ...t, mixerTrackId: mixerTrackId } : t,
+        ),
+        sampleTracks: p.sampleTracks.map((t) =>
+          t.id === channelId ? { ...t, mixerTrackId: mixerTrackId } : t,
+        ),
+      })),
+    }));
+  }, []);
+
+  const setMixerTrackEQBand = useCallback((mixerTrackId: string, bandIndex: number, band: EQBand) => {
+    audioEngine.current.setMixerTrackEQBand(mixerTrackId, bandIndex, band);
+    setState((prev) => ({
+      ...prev,
+      mixerTracks: prev.mixerTracks.map((t) =>
+        t.id === mixerTrackId
+          ? { ...t, eqBands: t.eqBands.map((b, i) => (i === bandIndex ? band : b)) }
+          : t,
+      ),
+    }));
+  }, []);
+
+  const setMixerTrackEQEnabled = useCallback((mixerTrackId: string, enabled: boolean) => {
+    setState((prev) => {
+      const track = prev.mixerTracks.find((t) => t.id === mixerTrackId);
+      if (!track) return prev;
+      audioEngine.current.setMixerTrackEQEnabled(mixerTrackId, enabled, track.eqBands);
+      return {
+        ...prev,
+        mixerTracks: prev.mixerTracks.map((t) =>
+          t.id === mixerTrackId ? { ...t, eqEnabled: enabled } : t,
+        ),
+      };
+    });
+  }, []);
+
+  // -----------------------------------------------------------------------
   // Automation actions
   // -----------------------------------------------------------------------
 
@@ -2252,6 +2380,7 @@ function useSequencer() {
     audioEngine.current.setDelayParams(INITIAL_STATE.masterDelay);
     audioEngine.current.setDelayBpm(INITIAL_STATE.bpm, INITIAL_STATE.masterDelay.sync);
     audioEngine.current.setFilterParams(INITIAL_STATE.masterFilter);
+    audioEngine.current.setMasterLimiter(INITIAL_STATE.masterLimiter);
   }, []);
 
   const setProjectName = useCallback((name: string) => {
@@ -2281,6 +2410,8 @@ function useSequencer() {
       metronomeEnabled: s.metronomeEnabled,
       swing: s.swing,
       sendChannels: s.sendChannels,
+      mixerTracks: s.mixerTracks,
+      masterLimiter: s.masterLimiter,
     };
     const res = await fetch(`${API_BASE}/api/projects/${id}`, {
       method: 'PUT',
@@ -2314,6 +2445,12 @@ function useSequencer() {
       metronomeEnabled: project.metronomeEnabled,
       swing: project.swing ?? 0,
       sendChannels: project.sendChannels ?? [],
+      mixerTracks: (project.mixerTracks ?? []).map((mt) => ({
+        ...mt,
+        eqBands: mt.eqBands ?? DEFAULT_EQ_BANDS.map((b) => ({ ...b })),
+        eqEnabled: mt.eqEnabled ?? true,
+      })),
+      masterLimiter: project.masterLimiter ?? { ...DEFAULT_MASTER_LIMITER },
       // Reset playback state
       isPlaying: false,
       currentStep: -1,
@@ -2326,11 +2463,28 @@ function useSequencer() {
     audioEngine.current.setDelayParams(project.masterDelay);
     audioEngine.current.setDelayBpm(project.bpm, project.masterDelay.sync);
     audioEngine.current.setFilterParams(project.masterFilter);
+    audioEngine.current.setMasterLimiter(project.masterLimiter ?? DEFAULT_MASTER_LIMITER);
     // Restore send channels
     for (const sc of project.sendChannels ?? []) {
       audioEngine.current.ensureSendChannel(sc.id, sc.volume);
       if (sc.insertEffects.length > 0) {
         audioEngine.current.rebuildSendChannelInsertEffects(sc.id, sc.insertEffects);
+      }
+    }
+    // Restore mixer tracks and channel routing
+    for (const mt of project.mixerTracks ?? []) {
+      audioEngine.current.ensureMixerTrack(mt.id, mt.volume, mt.pan, mt.eqBands ?? DEFAULT_EQ_BANDS.map((b) => ({ ...b })), mt.eqEnabled ?? true);
+    }
+    for (const p of project.patterns) {
+      for (const t of p.tracks) {
+        if (t.mixerTrackId) {
+          audioEngine.current.setChannelMixerRouting(t.id, t.mixerTrackId);
+        }
+      }
+      for (const t of p.sampleTracks) {
+        if (t.mixerTrackId) {
+          audioEngine.current.setChannelMixerRouting(t.id, t.mixerTrackId);
+        }
       }
     }
   }, [API_BASE]);
@@ -2409,6 +2563,7 @@ function useSequencer() {
     setMasterDelay,
     setTrackFilterSend,
     setMasterFilter,
+    setMasterLimiter,
     setSynthSettings,
     // Sample management
     loadSample,
@@ -2447,6 +2602,15 @@ function useSequencer() {
     toggleSendChannelInsertEffect,
     updateSendChannelInsertEffectParams,
     moveSendChannelInsertEffect,
+    // Mixer tracks
+    addMixerTrack,
+    removeMixerTrack,
+    renameMixerTrack,
+    setMixerTrackVolume,
+    setMixerTrackPan,
+    setChannelMixerRouting,
+    setMixerTrackEQBand,
+    setMixerTrackEQEnabled,
     // Automation
     addAutomationLane,
     removeAutomationLane,

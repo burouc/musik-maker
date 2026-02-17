@@ -1,4 +1,4 @@
-import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, SynthSettings, OscillatorType, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, SendChannel, MixerTrack, EQBand } from '../types';
+import type { InstrumentName, ReverbSettings, DelaySettings, DelaySync, FilterSettings, MasterLimiterSettings, SynthSettings, OscillatorType, LfoSettings, SampleFormat, InsertEffect, InsertEffectType, InsertEffectParams, FilterEffectParams, ReverbEffectParams, DelayEffectParams, DistortionEffectParams, ChorusEffectParams, FlangerEffectParams, PhaserEffectParams, CompressorEffectParams, SendChannel, MixerTrack, EQBand } from '../types';
 
 /** Accepted MIME types for sample loading */
 const SAMPLE_MIME_TYPES: Record<SampleFormat, string> = {
@@ -18,6 +18,10 @@ class AudioEngine {
   private panners: Map<InstrumentName, StereoPannerNode> = new Map();
   private channelAnalysers: Map<InstrumentName, AnalyserNode> = new Map();
   private masterAnalyser: AnalyserNode;
+
+  // Master bus limiter (DynamicsCompressor configured as a brickwall limiter)
+  private masterLimiter: DynamicsCompressorNode;
+  private masterLimiterEnabled: boolean = true;
 
   // Reverb send/return bus
   private reverbSendGains: Map<InstrumentName, GainNode> = new Map();
@@ -80,11 +84,22 @@ class AudioEngine {
     this.context = new AudioContext();
     this.masterGain = this.context.createGain();
 
-    // Master analyser sits between master gain and destination
+    // Master bus limiter (brickwall limiter before the analyser/output)
+    // Signal: masterGain → masterLimiter → masterAnalyser → destination
+    this.masterLimiter = this.context.createDynamicsCompressor();
+    this.masterLimiter.threshold.value = -1;
+    this.masterLimiter.ratio.value = 20;
+    this.masterLimiter.attack.value = 0.001;
+    this.masterLimiter.release.value = 0.1;
+    this.masterLimiter.knee.value = 0;
+    this.masterLimiterEnabled = true;
+
+    // Master analyser sits between limiter and destination
     this.masterAnalyser = this.context.createAnalyser();
     this.masterAnalyser.fftSize = 256;
     this.masterAnalyser.smoothingTimeConstant = 0.3;
-    this.masterGain.connect(this.masterAnalyser);
+    this.masterGain.connect(this.masterLimiter);
+    this.masterLimiter.connect(this.masterAnalyser);
     this.masterAnalyser.connect(this.context.destination);
     this.masterGain.gain.value = 0.8;
 
@@ -324,7 +339,69 @@ class AudioEngine {
       osc3Gain.connect(filter);
     }
     filter.connect(gain);
-    gain.connect(this.masterGain);
+
+    // Output chain: gain → panNode → masterGain (pan node needed for LFO pan modulation)
+    const panNode = this.context.createStereoPanner();
+    panNode.pan.setValueAtTime(0, now);
+    gain.connect(panNode);
+    panNode.connect(this.masterGain);
+
+    // Apply LFO modulation
+    const lfoNodes: OscillatorNode[] = [];
+    for (const lfo of [settings?.lfo1, settings?.lfo2]) {
+      if (!lfo || !lfo.enabled || lfo.depth <= 0) continue;
+
+      const lfoOsc = this.context.createOscillator();
+      lfoOsc.type = lfo.waveform;
+      lfoOsc.frequency.setValueAtTime(lfo.rate, now);
+
+      const lfoGain = this.context.createGain();
+
+      switch (lfo.target) {
+        case 'pitch': {
+          // Modulate oscillator frequency via detune (depth maps to 0–200 cents)
+          lfoGain.gain.setValueAtTime(lfo.depth * 200, now);
+          lfoOsc.connect(lfoGain);
+          lfoGain.connect(osc1.detune);
+          lfoGain.connect(osc2.detune);
+          if (osc3) lfoGain.connect(osc3.detune);
+          break;
+        }
+        case 'filter': {
+          // Modulate filter cutoff frequency (depth maps to 0–4000 Hz swing)
+          lfoGain.gain.setValueAtTime(lfo.depth * 4000, now);
+          lfoOsc.connect(lfoGain);
+          lfoGain.connect(filter.frequency);
+          break;
+        }
+        case 'volume': {
+          // Modulate gain (tremolo). We use a secondary gain node to avoid
+          // interfering with the ADSR envelope.
+          // LFO output range is −1..+1, so depth*0.5 means ±50% volume swing
+          const tremoloGain = this.context.createGain();
+          tremoloGain.gain.setValueAtTime(1, now);
+          lfoGain.gain.setValueAtTime(lfo.depth * 0.5, now);
+          lfoOsc.connect(lfoGain);
+          lfoGain.connect(tremoloGain.gain);
+          // Re-route: gain → tremoloGain → panNode
+          gain.disconnect(panNode);
+          gain.connect(tremoloGain);
+          tremoloGain.connect(panNode);
+          break;
+        }
+        case 'pan': {
+          // Modulate stereo pan (auto-pan). depth maps to 0–1 pan range
+          lfoGain.gain.setValueAtTime(lfo.depth, now);
+          lfoOsc.connect(lfoGain);
+          lfoGain.connect(panNode.pan);
+          break;
+        }
+      }
+
+      lfoOsc.start(now);
+      lfoOsc.stop(releaseEnd + 0.01);
+      lfoNodes.push(lfoOsc);
+    }
 
     osc1.start(now);
     osc2.start(now);
@@ -493,6 +570,33 @@ class AudioEngine {
     if (params.resonance !== undefined) {
       this.filterNode.Q.value = Math.max(0.1, Math.min(25, params.resonance));
     }
+  }
+
+  /** Update the master bus limiter settings. */
+  setMasterLimiter(params: Partial<MasterLimiterSettings>): void {
+    if (params.enabled !== undefined) {
+      this.masterLimiterEnabled = params.enabled;
+      // Rewire: masterGain → (limiter | bypass) → masterAnalyser
+      this.masterGain.disconnect();
+      if (params.enabled) {
+        this.masterGain.connect(this.masterLimiter);
+        this.masterLimiter.connect(this.masterAnalyser);
+      } else {
+        this.masterLimiter.disconnect();
+        this.masterGain.connect(this.masterAnalyser);
+      }
+    }
+    if (params.threshold !== undefined) {
+      this.masterLimiter.threshold.value = Math.max(-24, Math.min(0, params.threshold));
+    }
+    if (params.release !== undefined) {
+      this.masterLimiter.release.value = Math.max(0.01, Math.min(1, params.release));
+    }
+  }
+
+  /** Get the current gain reduction of the master limiter in dB (negative value). */
+  getMasterLimiterReduction(): number {
+    return this.masterLimiter.reduction;
   }
 
   // ---------------------------------------------------------------------------

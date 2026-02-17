@@ -2489,6 +2489,16 @@
   margin: 0 4px;
 }
 
+.synth-lfo-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
 /* Velocity lane below the piano roll grid */
 .velocity-lane {
   display: flex;
