@@ -100,7 +100,7 @@ Features are grouped by category. Each item is marked with a priority:
 - [x] **[P0]** One-shot and looping sample playback modes
 - [x] **[P0]** Sample preview before loading
 - [ ] **[P1]** Basic sample editing (trim start/end, gain)
-- [ ] **[P1]** Pitch-shift samples to match note
+- [x] **[P1]** Pitch-shift samples to match note
 - [ ] **[P1]** Sample browser panel with folder navigation
 - [ ] **[P2]** Time-stretch samples to match BPM
 - [ ] **[P2]** Sliced breakbeat mode (chop a loop into steps)
