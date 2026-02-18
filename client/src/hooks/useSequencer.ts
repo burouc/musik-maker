@@ -86,6 +86,7 @@ function createDefaultTracks(stepCount: number = DEFAULT_STEP_COUNT): Track[] {
     { id: 'clap', name: 'Clap', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
     { id: 'openhat', name: 'Open Hat', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
     { id: 'percussion', name: 'Percussion', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
+    { id: 'guitar', name: 'Guitar', steps: Array(stepCount).fill(0), pitches: Array(stepCount).fill(0), volume: 0.8, pan: 0, muted: false, solo: false, reverbSend: 0, delaySend: 0, filterSend: 0, insertEffects: [], sends: {}, mixerTrackId: null },
   ];
 }
 

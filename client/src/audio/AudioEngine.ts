@@ -161,7 +161,7 @@ class AudioEngine {
     this.filterReturnGain.connect(this.masterGain);
 
     // Create a gain + stereo panner + analyser per instrument channel
-    const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion'];
+    const instruments: InstrumentName[] = ['kick', 'snare', 'hihat', 'clap', 'openhat', 'percussion', 'guitar'];
     for (const name of instruments) {
       const analyser = this.context.createAnalyser();
       analyser.fftSize = 256;
@@ -473,6 +473,9 @@ class AudioEngine {
         break;
       case 'percussion':
         this.playPercussion(volume, pitchOffset, output);
+        break;
+      case 'guitar':
+        this.playGuitar(volume, pitchOffset, output);
         break;
     }
   }
@@ -1906,6 +1909,67 @@ class AudioEngine {
 
     osc.start(now);
     osc.stop(now + 0.08);
+  }
+
+  private playGuitar(volume: number, pitchOffset: number = 0, output: AudioNode = this.masterGain): void {
+    const now = this.context.currentTime;
+    const ratio = this.pitchRatio(pitchOffset);
+    const baseFreq = 196 * ratio; // G3 – open G string
+    const duration = 1.5;
+
+    // --- Pluck transient: short burst of filtered noise ---
+    const noiseSource = this.context.createBufferSource();
+    noiseSource.buffer = this.noiseBuffer;
+    const noiseFilter = this.context.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = baseFreq * 3;
+    noiseFilter.Q.value = 2;
+    const noiseGain = this.context.createGain();
+    noiseGain.gain.setValueAtTime(0.4 * volume, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+    noiseSource.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(output);
+    noiseSource.start(now);
+    noiseSource.stop(now + 0.03);
+
+    // --- Body: sawtooth oscillator through a decaying lowpass filter ---
+    const osc = this.context.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = baseFreq;
+
+    const bodyFilter = this.context.createBiquadFilter();
+    bodyFilter.type = 'lowpass';
+    bodyFilter.frequency.setValueAtTime(baseFreq * 6, now);
+    bodyFilter.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + duration);
+    bodyFilter.Q.value = 1;
+
+    const bodyGain = this.context.createGain();
+    bodyGain.gain.setValueAtTime(0.35 * volume, now);
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(bodyFilter);
+    bodyFilter.connect(bodyGain);
+    bodyGain.connect(output);
+
+    osc.start(now);
+    osc.stop(now + duration);
+
+    // --- Second harmonic for richness ---
+    const osc2 = this.context.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.value = baseFreq * 2;
+
+    const harmGain = this.context.createGain();
+    harmGain.gain.setValueAtTime(0.15 * volume, now);
+    harmGain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.7);
+
+    osc2.connect(bodyFilter);
+    bodyFilter.connect(harmGain);
+    harmGain.connect(output);
+
+    osc2.start(now);
+    osc2.stop(now + duration * 0.7);
   }
 
   // ---------------------------------------------------------------------------

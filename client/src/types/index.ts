@@ -4,7 +4,8 @@ export type InstrumentName =
   | 'hihat'
   | 'clap'
   | 'openhat'
-  | 'percussion';
+  | 'percussion'
+  | 'guitar';
 
 export interface Track {
   id: InstrumentName;
